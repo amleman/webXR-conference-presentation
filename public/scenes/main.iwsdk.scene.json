@@ -1,0 +1,111 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [0.035, 0.098, 0.142, 1],
+      "equator": [0.018, 0.05, 0.078, 1],
+      "ground": [0.008, 0.016, 0.03, 1],
+      "intensity": 1
+    }
+  },
+  "resources": {},
+  "nodes": [
+    {
+      "id": "cyber-floor",
+      "name": "Suelo Cyber Grid",
+      "content": {
+        "type": "asset",
+        "asset": "cyber-floor"
+      },
+      "transform": {
+        "position": [0, 0, 0]
+      },
+      "components": {
+        "LocomotionEnvironment": {}
+      }
+    },
+    {
+      "id": "particle-field",
+      "name": "Campo de partículas",
+      "content": {
+        "type": "asset",
+        "asset": "particle-field"
+      },
+      "transform": {
+        "position": [0, 0, 0]
+      },
+      "components": {}
+    },
+    {
+      "id": "decor-past",
+      "name": "Monolito (el pasado)",
+      "content": {
+        "type": "asset",
+        "asset": "legacy-monolith"
+      },
+      "transform": {
+        "position": [-2.35, 1.25, -2.1],
+        "rotationDeg": [0, 24, 0]
+      },
+      "components": {
+        "FloatingDecor": {
+          "spinSpeed": 0.18,
+          "bobAmplitude": 0.06,
+          "bobSpeed": 0.55,
+          "tiltSpeed": 0.04
+        }
+      }
+    },
+    {
+      "id": "decor-future",
+      "name": "Singularidad (el futuro)",
+      "content": {
+        "type": "asset",
+        "asset": "singularity"
+      },
+      "transform": {
+        "position": [2.35, 1.35, -2.1],
+        "rotationDeg": [0, -18, 0]
+      },
+      "components": {
+        "FloatingDecor": {
+          "spinSpeed": -0.45,
+          "bobAmplitude": 0.11,
+          "bobSpeed": 0.9,
+          "tiltSpeed": 0.3
+        }
+      }
+    },
+    {
+      "id": "key-light-past",
+      "name": "Luz del monolito",
+      "transform": {
+        "position": [-2.1, 2.5, -1.2]
+      },
+      "components": {
+        "com.iwsdk.components.PointLight": {
+          "color": [1, 0.72, 0.28, 1],
+          "intensity": 12,
+          "distance": 7,
+          "decay": 2
+        }
+      }
+    },
+    {
+      "id": "fill-light",
+      "name": "Relleno frío",
+      "transform": {
+        "position": [1.2, 2.6, 0.4]
+      },
+      "components": {
+        "com.iwsdk.components.PointLight": {
+          "color": [0.18, 0.72, 0.92, 1],
+          "intensity": 9,
+          "distance": 8,
+          "decay": 2
+        }
+      }
+    }
+  ]
+}

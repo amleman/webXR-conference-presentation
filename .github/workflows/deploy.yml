@@ -1,0 +1,66 @@
+# Publica la presentación en GitHub Pages en cada push a la rama principal.
+#
+# Requisito único en el repositorio: Settings → Pages → Source = "GitHub Actions".
+# No hace falta rama `gh-pages` ni token adicional.
+#
+# WebXR exige un contexto seguro: GitHub Pages sirve por HTTPS, así que el
+# enlace publicado funciona tal cual en el navegador de Meta Quest.
+
+name: Deploy a GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Permisos mínimos para que la acción de despliegue publique el artefacto.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez; no se cancela el que ya está en vuelo.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar tipos
+        run: npm run typecheck
+
+      - name: Compilar
+        run: npm run build
+
+      # Sin este fichero, GitHub Pages pasa la salida por Jekyll y descarta
+      # cualquier ruta que empiece por guion bajo.
+      - name: Desactivar Jekyll
+        run: touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
