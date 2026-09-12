@@ -355,6 +355,7 @@ export class Deck2D {
   private readonly header: HTMLElement;
   private readonly stage: HTMLElement;
   private readonly footer: HTMLElement;
+  private readonly cornerMedia: HTMLElement;
   private readonly actions: DeckActions;
   private readonly disposers: Array<() => void> = [];
 
@@ -367,6 +368,7 @@ export class Deck2D {
     this.header = document.getElementById('deck-header') as HTMLElement;
     this.stage = document.getElementById('slide-stage') as HTMLElement;
     this.footer = document.getElementById('deck-footer') as HTMLElement;
+    this.cornerMedia = document.getElementById('deck-corner-media') as HTMLElement;
   }
 
   /** Conecta listeners y suscribe el render a las señales. */
@@ -465,7 +467,30 @@ export class Deck2D {
         ${this.vrButtonMarkup(index, /* hero */ false, index !== REVEAL_INDEX)}
       </div>`;
 
+    this.renderCornerMedia(slide);
     this.bindMediaFallbacks();
+  }
+
+  /**
+   * Decorado de esquina: la imagen que no va dentro del marco.
+   *
+   * La misma entrada de `media` sigue produciendo un satélite flotante en XR;
+   * aquí abajo sólo cambia cómo se presenta cuando el medio es una pantalla.
+   */
+  private renderCornerMedia(slide: Slide): void {
+    const corner = (slide.media ?? []).find((m) => m.screen === 'corner');
+    if (corner == null) {
+      this.cornerMedia.innerHTML = '';
+      return;
+    }
+    this.cornerMedia.innerHTML = `
+      <img src="${mediaUrl(corner.src)}" alt="" loading="lazy" />`;
+
+    // Si el archivo no está, se retira sin dejar el icono de imagen rota.
+    const img = this.cornerMedia.querySelector('img');
+    img?.addEventListener('error', () => { this.cornerMedia.innerHTML = ''; }, {
+      once: true,
+    });
   }
 
   /** Portada y revelación: tipografía grande y centrada. */
@@ -577,7 +602,9 @@ export class Deck2D {
    * diferencia entre ambas capas es justo el argumento de la charla.
    */
   private mediaMarkup(slide: Slide, compact: boolean): string {
-    const media = slide.media ?? [];
+    const media = (slide.media ?? []).filter(
+      (m) => (m.screen ?? 'inline') === 'inline',
+    );
     if (media.length === 0) {
       return '';
     }

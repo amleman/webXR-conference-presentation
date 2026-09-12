@@ -8,17 +8,26 @@ Los nombres y las proporciones los declara `src/presentation/slides.ts` (campo
 
 ## Las que hay ahora
 
-| Archivo                        | Slide | Dónde flota en XR | Fuente |
-| ------------------------------ | ----- | ----------------- | ------ |
-| `meta-quest-3s.webp`           | 1     | derecha           | prensa de Meta |
-| `meta-xr-all-in-one-sdk.jpg`   | 2     | izquierda         | assetstore.unity.com |
-| `Unity-Meta-parntership.webp`  | 2     | derecha           | uploadvr.com |
-| `buildingblocks.png`           | 3     | izquierda         | medium.com/antaeus-ar |
-| `meta-xr-interaction-sdk.jpg`  | 3     | derecha           | assetstore.unity.com |
-| `meta-xr-core-sdk.jpg`         | 3     | **cenital**       | assetstore.unity.com |
+| Archivo                        | Slide | En XR (`placement`) | En 2D (`screen`) | Fuente |
+| ------------------------------ | ----- | ------------------- | ---------------- | ------ |
+| `meta-quest-3s.webp`           | 1     | derecha             | fondo, esquina   | prensa de Meta |
+| `meta-xr-all-in-one-sdk.jpg`   | 2     | izquierda           | oculta           | assetstore.unity.com |
+| `Unity-Meta-parntership.webp`  | 2     | derecha             | oculta           | uploadvr.com |
+| `buildingblocks.png`           | 3     | izquierda           | en línea         | medium.com/antaeus-ar |
+| `meta-xr-interaction-sdk.jpg`  | 3     | derecha             | en línea         | assetstore.unity.com |
+| `meta-xr-core-sdk.jpg`         | 3     | **cenital**         | en línea         | assetstore.unity.com |
 
-Las tres posiciones (`left`, `right`, `overhead`) existen para que en XR las
-imágenes rodeen al espectador en vez de apilarse dentro del panel.
+Las tres posiciones de `placement` (`left`, `right`, `overhead`) existen para que
+en XR las imágenes rodeen al espectador en vez de apilarse dentro del panel.
+
+`screen` es independiente y gobierna sólo la capa 2D: `inline` la pone en la tira
+dentro del contenido, `corner` la usa como decorado de fondo en la esquina
+inferior izquierda, y `none` la omite. Una imagen puede no aparecer en 2D y
+seguir flotando en XR — que es el caso de las dos de la slide 2.
+
+Una imagen marcada como `corner` debería tener **fondo negro puro**: la capa 2D la
+compone con `mix-blend-mode: screen`, que vuelve el negro transparente y funde el
+objeto con el fondo del deck sin recortes ni máscaras.
 
 ## Para añadir o cambiar una
 

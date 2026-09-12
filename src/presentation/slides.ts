@@ -26,6 +26,17 @@ export type SlideVisual =
  */
 export type MediaPlacement = 'left' | 'right' | 'overhead';
 
+/**
+ * Cómo aparece una imagen en el deck 2D. Independiente de `placement`, que sólo
+ * gobierna XR.
+ *
+ * Una pantalla no es un espacio: apilar figuras dentro del marco estira la
+ * diapositiva hacia abajo y le quita la proporción. Por eso el 2D puede llevar
+ * una imagen al fondo (`corner`) u omitirla (`none`) mientras en XR esa misma
+ * imagen sigue flotando junto al espectador.
+ */
+export type MediaScreenMode = 'inline' | 'corner' | 'none';
+
 export interface SlideMedia {
   /** Nombre del archivo dentro de `public/images/`, sin barra inicial. */
   src: string;
@@ -35,7 +46,10 @@ export interface SlideMedia {
   source?: string;
   /** Proporción ancho/alto. Reserva el espacio antes de que cargue. */
   aspect?: number;
+  /** Dónde flota en XR. */
   placement: MediaPlacement;
+  /** Cómo se muestra en el deck 2D. Por defecto, `'inline'`. */
+  screen?: MediaScreenMode;
 }
 
 /** Acento cromático de la slide; se usa en CSS y en la textura 3D. */
@@ -96,6 +110,7 @@ export const SLIDES: readonly Slide[] = [
         caption: 'Meta Quest 3S',
         aspect: 1.5,
         placement: 'right',
+        screen: 'corner',
       },
     ],
   },
@@ -139,6 +154,7 @@ export const SLIDES: readonly Slide[] = [
         source: 'assetstore.unity.com',
         aspect: 1.5,
         placement: 'left',
+        screen: 'none',
       },
       {
         src: 'Unity-Meta-parntership.webp',
@@ -146,6 +162,7 @@ export const SLIDES: readonly Slide[] = [
         source: 'uploadvr.com',
         aspect: 1.903,
         placement: 'right',
+        screen: 'none',
       },
     ],
   },

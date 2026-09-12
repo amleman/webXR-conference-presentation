@@ -15,12 +15,14 @@ import {
   Hovered,
   InputComponent,
   MeshBasicMaterial,
+  PokeInteractable,
   Pressed,
   RayInteractable,
   SRGBColorSpace,
   VisibilityState,
   type Entity,
   type Mesh,
+  type Texture,
 } from '@iwsdk/core';
 import { Deck2D } from '../presentation/Deck2D.js';
 import { PALETTE } from '../presentation/EnvironmentBuilder.js';
@@ -40,6 +42,7 @@ import {
   createButtonTexture,
   createMediaFrameTexture,
   createSlideTexture,
+  createStatusTexture,
   type SlideTextureHandle,
 } from '../presentation/SlideTexture.js';
 import {
@@ -58,8 +61,13 @@ const PANEL_Z = -2;
 const NAV_Y = 0.56;
 const NAV_Z = -1.9;
 const NAV_TILT = -0.32;
-const NAV_BUTTON_WIDTH = 0.52;
-const NAV_BUTTON_HEIGHT = 0.16;
+const NAV_BUTTON_WIDTH = 0.58;
+const NAV_BUTTON_HEIGHT = 0.2;
+
+/** Insignia del modo de entrada, centrada bajo la fila de botones. */
+const BADGE_WIDTH = 0.42;
+const BADGE_HEIGHT = 0.11;
+const BADGE_Y = NAV_Y - 0.2;
 
 /** Duración de la materialización de los paneles al entrar en VR, en segundos. */
 const REVEAL_DURATION = 0.7;
@@ -72,9 +80,9 @@ interface NavButtonSpec {
 }
 
 const NAV_BUTTONS: readonly NavButtonSpec[] = [
-  { action: 'prev', label: '‹  ANTERIOR', accent: PALETTE.cyan, x: -0.8 },
+  { action: 'prev', label: '‹  ANTERIOR', accent: PALETTE.cyan, x: -0.86 },
   { action: 'next', label: 'SIGUIENTE  ›', accent: PALETTE.cyan, x: 0 },
-  { action: 'exit', label: 'SALIR', accent: PALETTE.magenta, x: 0.8 },
+  { action: 'exit', label: 'SALIR', accent: PALETTE.magenta, x: 0.86 },
 ];
 
 export class PresentationSystem extends createSystem({
@@ -96,6 +104,11 @@ export class PresentationSystem extends createSystem({
   }> = [];
   /** Progreso 0→1 de la aparición de los paneles al entrar en XR. */
   private reveal = 0;
+  /** Insignia que anuncia si se está navegando con manos o con mandos. */
+  private badgeMaterial!: MeshBasicMaterial;
+  private handTextures!: { hands: Texture; controllers: Texture };
+  /** Último modo publicado en la insignia, para repintar sólo al cambiar. */
+  private showingHands: boolean | null = null;
 
   init(): void {
     // El resultado se publica en la señal `xrSupported`; no bloquea el arranque.
@@ -115,6 +128,7 @@ export class PresentationSystem extends createSystem({
     }
 
     this.stepReveal(delta);
+    this.syncInputModeBadge();
     this.pollControllerButtons();
   }
 
@@ -142,6 +156,7 @@ export class PresentationSystem extends createSystem({
       this.createNavButton(spec, rigEntity);
     }
 
+    this.buildInputModeBadge();
     this.buildMediaPanels();
 
     this.cleanupFuncs.push(() => {
@@ -170,9 +185,70 @@ export class PresentationSystem extends createSystem({
     this.world
       .createTransformEntity(mesh, { parent })
       .addComponent(RayInteractable)
+      // `PokeInteractable` no cuesta nada aquí y suma otra vía de disparo: si el
+      // presentador camina hasta el panel, puede pulsar el botón con el dedo.
+      // Ambas rutas producen `Pressed`, así que la lógica de abajo no cambia.
+      .addComponent(PokeInteractable)
       .addComponent(NavButton, { action: spec.action });
 
     this.cleanupFuncs.push(() => texture.dispose());
+  }
+
+  /**
+   * Insignia que anuncia con qué se está navegando.
+   *
+   * Existe por el público, no por el presentador: cuando alguien suelta los
+   * mandos y sigue pasando diapositivas con la mano, la insignia cambia de
+   * MANDOS a MANOS y la sala ve que no había truco.
+   */
+  private buildInputModeBadge(): void {
+    this.handTextures = {
+      hands: createStatusTexture('✋  MANOS', PALETTE.cyan),
+      controllers: createStatusTexture('🎮  MANDOS', PALETTE.violet),
+    };
+
+    const mesh = createButtonMesh(
+      this.handTextures.controllers,
+      BADGE_WIDTH,
+      BADGE_HEIGHT,
+    );
+    mesh.name = 'InputModeBadge';
+    mesh.position.set(0, BADGE_Y, NAV_Z);
+    mesh.rotation.x = NAV_TILT;
+
+    this.badgeMaterial = mesh.material as MeshBasicMaterial;
+    this.fadeMaterials.push(this.badgeMaterial);
+    this.rig.add(mesh);
+
+    this.cleanupFuncs.push(() => {
+      this.handTextures.hands.dispose();
+      this.handTextures.controllers.dispose();
+    });
+  }
+
+  /**
+   * Conmuta la insignia según lo que el runtime considere fuente primaria.
+   *
+   * Se comprueba por frame porque el usuario puede soltar los mandos en
+   * cualquier momento, pero sólo se toca el material cuando el modo cambia de
+   * verdad.
+   */
+  private syncInputModeBadge(): void {
+    if (this.badgeMaterial == null) {
+      return;
+    }
+    const xr = this.input.xr;
+    const usingHands =
+      xr.isPrimary('hand', 'left') || xr.isPrimary('hand', 'right');
+
+    if (usingHands === this.showingHands) {
+      return;
+    }
+    this.showingHands = usingHands;
+    this.badgeMaterial.map = usingHands
+      ? this.handTextures.hands
+      : this.handTextures.controllers;
+    this.badgeMaterial.needsUpdate = true;
   }
 
   /**
@@ -298,19 +374,28 @@ export class PresentationSystem extends createSystem({
       }
     });
 
-    // El color multiplica la textura: resaltar no cuesta ni un repintado.
+    // El color multiplica la textura: resaltar no cuesta ni un repintado. Al
+    // tinte se le suma un salto de escala, que es lo que hace legible desde la
+    // grada qué botón está apuntando el presentador.
     this.queries.navHovered.subscribe('qualify', (entity) => {
-      PresentationSystem.tintButton(entity, 1.6);
+      PresentationSystem.highlightButton(entity, 1.7, 1.09);
     });
     this.queries.navHovered.subscribe('disqualify', (entity) => {
-      PresentationSystem.tintButton(entity, 1);
+      PresentationSystem.highlightButton(entity, 1, 1);
     });
   }
 
-  private static tintButton(entity: Entity, brightness: number): void {
+  private static highlightButton(
+    entity: Entity,
+    brightness: number,
+    scale: number,
+  ): void {
     const mesh = entity.object3D as Mesh | undefined;
-    const material = mesh?.material as MeshBasicMaterial | undefined;
-    material?.color.setScalar(brightness);
+    if (mesh == null) {
+      return;
+    }
+    (mesh.material as MeshBasicMaterial).color.setScalar(brightness);
+    mesh.scale.setScalar(scale);
   }
 
   /**

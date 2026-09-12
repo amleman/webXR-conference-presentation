@@ -1016,3 +1016,48 @@ export function createMediaFrameTexture(
   texture.generateMipmaps = false;
   return texture;
 }
+
+/**
+ * Insignia de estado del modo de entrada ("MANOS" / "MANDOS").
+ *
+ * Más sobria que un botón: sin resplandor y con menos contraste, porque informa
+ * y no invita a pulsarla. Existe para que el público vea el cambio cuando el
+ * presentador suelta los mandos y sigue navegando con las manos.
+ */
+export function createStatusTexture(
+  label: string,
+  accent: string,
+  width = 512,
+  height = 132,
+): CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx == null) {
+    throw new Error('No se pudo obtener un contexto 2D para la insignia de estado');
+  }
+
+  const channels = rgb(accent);
+  ctx.clearRect(0, 0, width, height);
+
+  roundRect(ctx, 4, 4, width - 8, height - 8, (height - 8) / 2);
+  ctx.fillStyle = 'rgba(6, 12, 22, 0.72)';
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${channels}, 0.4)`;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 40px ${DISPLAY_FONT}`;
+  ctx.fillStyle = `rgba(${channels}, 0.95)`;
+  ctx.fillText(label, width / 2, height / 2 + 2);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.minFilter = LinearFilter;
+  texture.magFilter = LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
+}

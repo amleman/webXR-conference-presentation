@@ -130,6 +130,46 @@
         pointer-events: none;
       }
 
+      /* Decorado de esquina: una imagen suelta anclada abajo a la izquierda,
+         por detrás del contenido. */
+      #deck-corner-media {
+        position: absolute;
+        /* Por encima del pie de navegación, no detrás: los botones quedan
+           limpios y el visor se ve entero. */
+        bottom: 104px;
+        left: 0;
+        z-index: 0;
+        pointer-events: none;
+        user-select: none;
+        line-height: 0;
+      }
+      #deck-corner-media img {
+        display: block;
+        width: min(32vw, 440px);
+        /* Los archivos que van aquí traen fondo negro puro. `screen` lo vuelve
+           transparente, así que el objeto emerge del fondo del deck sin recorte
+           ni máscara: los bordes se funden solos. */
+        mix-blend-mode: screen;
+        opacity: 0.9;
+        animation: cornerIn 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes cornerIn {
+        from {
+          opacity: 0;
+          transform: translate3d(-24px, 24px, 0);
+        }
+        to {
+          opacity: 0.9;
+          transform: none;
+        }
+      }
+      @media (max-width: 640px) {
+        /* En móvil el contenido ya ocupa todo: el decorado sólo estorbaría. */
+        #deck-corner-media {
+          display: none;
+        }
+      }
+
       .font-display {
         font-family: Orbitron, system-ui, sans-serif;
         letter-spacing: 0.01em;
@@ -231,7 +271,8 @@
       @media (prefers-reduced-motion: reduce) {
         .slide-enter,
         .stagger > *,
-        .btn-vr-hero {
+        .btn-vr-hero,
+        #deck-corner-media img {
           animation: none !important;
         }
       }
@@ -284,6 +325,7 @@
     <!-- Capa 2D: Deck2D la puebla; este marcado es sólo el esqueleto. -->
     <div id="deck-2d">
       <div class="deck-backdrop"></div>
+      <div id="deck-corner-media" aria-hidden="true"></div>
       <header
         id="deck-header"
         class="relative flex items-center justify-between px-5 py-4 sm:px-10 sm:py-6"

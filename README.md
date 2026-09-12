@@ -123,7 +123,9 @@ renderer guarda una copia del texto.
   accent: { hex: ACCENT_EMERALD, kicker: 'MI SECCIÓN' },
   media: [
     { src: 'captura.png', caption: 'Pie', source: 'ejemplo.com',
-      aspect: 1.6, placement: 'left' },  // 'left' | 'right' | 'overhead'
+      aspect: 1.6,
+      placement: 'left',                 // en XR: 'left' | 'right' | 'overhead'
+      screen: 'inline' },                // en 2D: 'inline' | 'corner' | 'none'
   ],
 }
 ```
@@ -144,6 +146,11 @@ para la capa 2D y en canvas para la 3D:
 opcionales: si el archivo no está, la figura se retira sola en 2D y el satélite
 no aparece en XR. Nunca se ve una imagen rota. El único campo que hay que medir
 es `aspect` (ancho ÷ alto): si no coincide con el archivo, el panel la deforma.
+
+`placement` y `screen` son independientes a propósito. Una pantalla no es un
+espacio: apilar figuras dentro del marco estira la diapositiva y le quita la
+proporción, así que en 2D una imagen puede ir al fondo (`corner`) u omitirse
+(`none`) mientras en XR esa misma entrada sigue flotando junto al espectador.
 
 ## Cómo funciona
 
@@ -219,11 +226,19 @@ src/
 | **Teclado**      | `←` `→` · `Espacio` · `Inicio` / `Fin` · `V` para entrar en VR             |
 | **Ratón, táctil** | Botones, puntos de progreso, deslizar horizontalmente                   |
 | **Mando Quest**  | Apuntar y gatillo sobre los botones 3D; `A`/`X` avanza, `B`/`Y` retrocede |
+| **Manos**        | Apuntar con la mano y **pellizcar**; o acercarse y pulsar el botón con el dedo |
 
 Los botones de cara se usan a propósito en vez del joystick: los thumbsticks
 pertenecen a la locomoción, y un presentador que camina no debería cambiar de
 diapositiva sin querer. Dentro de VR se puede recorrer la rejilla — el suelo lleva
 `LocomotionEnvironment`.
+
+**Manos y mandos, sin cambiar nada.** Los botones llevan `RayInteractable` y
+`PokeInteractable`, y ambas rutas producen el mismo `Pressed`: se puede apuntar y
+pellizcar desde lejos, o caminar hasta el panel y pulsar con el dedo. Bajo la fila
+de botones hay una insignia que dice **MANOS** o **MANDOS** según lo que el
+runtime tenga como fuente primaria — está ahí por el público, para que se vea el
+cambio cuando el presentador suelta los mandos y sigue navegando con la mano.
 
 ## Compatibilidad
 
