@@ -10,23 +10,48 @@
 /** Mockups visuales que cada capa sabe dibujar a su manera. */
 export type SlideVisual =
   | 'none'
-  | 'unity-console'
+  | 'unity-editor'
+  | 'building-blocks'
   | 'webxr-flow'
   | 'ai-pillars';
 
-/** Acento cromático de la slide; se usa en CSS y en el shader/texture 3D. */
+/**
+ * Dónde vive una imagen cuando la presentación está en XR.
+ *
+ * En 2D todas caen en una tira bajo el contenido, porque la pantalla es un
+ * rectángulo y no hay más sitio. En XR se despegan del panel y flotan alrededor
+ * del espectador: ahí está el argumento de que los límites de una presentación
+ * inmersiva ya no son un cuadro 16:9.
+ */
+export type MediaPlacement = 'left' | 'right' | 'overhead';
+
+export interface SlideMedia {
+  /** Nombre del archivo dentro de `public/images/`, sin barra inicial. */
+  src: string;
+  /** Pie de imagen. También es el texto alternativo en 2D. */
+  caption: string;
+  /** Origen de la imagen, para la línea de atribución. */
+  source?: string;
+  /** Proporción ancho/alto. Reserva el espacio antes de que cargue. */
+  aspect?: number;
+  placement: MediaPlacement;
+}
+
+/** Acento cromático de la slide; se usa en CSS y en la textura 3D. */
 export interface SlideAccent {
   /** Color principal, en hexadecimal CSS (`#rrggbb`). */
   hex: string;
-  /** Etiqueta corta mostrada en la cápsula superior ("EL PASADO", …). */
+  /** Etiqueta corta mostrada en la cápsula superior ("EL WALKTHROUGH", …). */
   kicker: string;
 }
 
 export interface SlideBullet {
   /** Glifo corto a la izquierda del punto. Ninguna dependencia de iconos. */
   icon: string;
-  /** Frase principal del punto. */
+  /** Enunciado del punto. */
   text: string;
+  /** Desarrollo del punto, una línea por idea. Opcional. */
+  detail?: string[];
 }
 
 export interface Slide {
@@ -39,6 +64,7 @@ export interface Slide {
   bullets?: SlideBullet[];
   visual: SlideVisual;
   accent: SlideAccent;
+  media?: SlideMedia[];
 }
 
 export const ACCENT_CYAN = '#22d3ee';
@@ -46,56 +72,166 @@ export const ACCENT_AMBER = '#fbbf24';
 export const ACCENT_MAGENTA = '#e879f9';
 export const ACCENT_VIOLET = '#a78bfa';
 
+/** Quién presenta. Aparece en la portada, en las dos capas. */
+export const PRESENTER = {
+  name: 'Anthony Alemán',
+  role: 'VR / MR Expert',
+  year: '2026',
+} as const;
+
 export const SLIDES: readonly Slide[] = [
   {
     id: 'portada',
     kind: 'cover',
-    title: 'De la Compilación al Prompt',
-    subtitle: 'La Evolución del Desarrollo VR de Unity a WebXR e IA',
+    title: 'WebXR + Agentes de IA: Destronando la Complejidad del Desarrollo VR Tradicional',
+    subtitle:
+      'Una mirada evolutiva de la creación en motores 3D al desarrollo asistido en la web inmersiva.',
     visual: 'none',
     accent: { hex: ACCENT_CYAN, kicker: 'PORTADA' },
-  },
-  {
-    id: 'pasado',
-    kind: 'content',
-    title: 'El Pasado: Motores Pesados y Barreras de Entrada',
-    subtitle: 'Cuando publicar una idea costaba una tarde entera de builds.',
-    bullets: [
-      { icon: '⏳', text: 'Tiempos de compilación de horas por cada iteración' },
-      { icon: '🧱', text: 'SDKs nativos pesados y acoplados al dispositivo' },
-      { icon: '📦', text: 'Archivos APK de gigabytes que el usuario debía instalar' },
-      { icon: '🔒', text: 'Tiendas cerradas: revisión, permisos y meses de espera' },
+    media: [
+      {
+        src: 'quest-3s.jpg',
+        caption: 'Meta Quest 3S',
+        aspect: 1.5,
+        placement: 'right',
+      },
     ],
-    visual: 'unity-console',
-    accent: { hex: ACCENT_AMBER, kicker: 'EL PASADO' },
   },
+
   {
-    id: 'presente',
+    id: 'walkthrough',
     kind: 'content',
-    title: 'El Presente: Inmersión Instantánea sin Instalación',
-    subtitle: 'La experiencia es una URL. Nada más.',
+    title: 'El Walkthrough Tradicional: Entorno y Flujo de Desarrollo en Unity',
+    subtitle: 'Qué hace falta, de verdad, para montar un proyecto VR desde cero.',
+    bullets: [
+      {
+        icon: '⚙️',
+        text: 'El setup inicial',
+        detail: [
+          'Proyecto Unity con Android Build Support, requisito de los visores standalone como Meta Quest',
+          'Instalación e integración del Meta XR SDK y las dependencias de OpenXR',
+        ],
+      },
+      {
+        icon: '🔁',
+        text: 'El dilema de la prueba e iteración (testing loop)',
+        detail: [
+          'Opción A — Quest Link / Air Link: se itera directamente en el Editor vía ADB, pero exige una estación con GPU dedicada compatible',
+          'Opción B — sin GPU de gama alta: cada ajuste obliga a compilar, generar el APK y desplegarlo al visor por ADB',
+        ],
+      },
+      {
+        icon: '⏱️',
+        text: 'El impacto en el tiempo',
+        detail: [
+          'Compilar → Generar APK → Transferir → Probar suma minutos u horas al flujo diario, sólo en pruebas de concepto',
+        ],
+      },
+    ],
+    visual: 'unity-editor',
+    accent: { hex: ACCENT_AMBER, kicker: 'EL WALKTHROUGH' },
+    media: [
+      {
+        src: 'meta-unity-sdk.jpg',
+        caption: 'Meta XR SDK para Unity',
+        source: 'developers.meta.com/horizon',
+        aspect: 1.6,
+        placement: 'left',
+      },
+      {
+        src: 'meta-unity-partnership.jpg',
+        caption: 'Meta y Unity, alianza multianual',
+        source: 'uploadvr.com',
+        aspect: 1.6,
+        placement: 'right',
+      },
+    ],
+  },
+
+  {
+    id: 'meta-xr-sdk',
+    kind: 'content',
+    title: 'Meta XR SDK, Fortalezas de Unity y Construcción de Mundos',
+    subtitle: 'El SDK moderno quita fricción; el mundo se sigue montando a mano.',
+    bullets: [
+      {
+        icon: '🧱',
+        text: 'La evolución del Meta XR SDK',
+        detail: [
+          'Building Blocks: módulos preconfigurados para arrastrar e integrar rigs de cámara, Passthrough, tracking de manos y controladores',
+          'Interaction SDK: agarres, poke, gestos y físicas de interacción sin programar la física desde cero',
+        ],
+      },
+      {
+        icon: '🛠️',
+        text: 'La artesanía del World Building',
+        detail: [
+          'Pese a las facilidades del SDK, el entorno sigue siendo 100 % manual: diagramar escenas, colocar prefabs objeto por objeto, ajustar colliders, iluminar y hornear lightmaps',
+        ],
+      },
+      {
+        icon: '💪',
+        text: 'Las grandes fortalezas de Unity',
+        detail: [
+          'Control total sobre física, shaders y rendimiento gráfico profundo (URP / HDRP)',
+          'Ecosistema maduro con la Asset Store y capacidad de escalar a experiencias AAA masivas',
+        ],
+      },
+    ],
+    visual: 'building-blocks',
+    accent: { hex: ACCENT_AMBER, kicker: 'EL SDK MODERNO' },
+    media: [
+      {
+        src: 'building-blocks.jpg',
+        caption: 'Building Blocks del Meta XR SDK',
+        source: 'medium.com/antaeus-ar',
+        aspect: 1.6,
+        placement: 'left',
+      },
+      {
+        src: 'interaction-sdk.jpg',
+        caption: 'Meta XR Interaction SDK Essentials',
+        source: 'assetstore.unity.com',
+        aspect: 1.6,
+        placement: 'right',
+      },
+    ],
+  },
+
+  {
+    id: 'webxr',
+    kind: 'content',
+    title: 'WebXR: Inmersión Instantánea, Sin Instalación',
+    subtitle: 'La experiencia es una URL. Ahí se acaba el ciclo de APK y ADB.',
     bullets: [
       { icon: '⚡', text: 'Cero descargas y cero instalaciones para el espectador' },
       { icon: '🔗', text: 'Acceso mediante un enlace web o un código QR' },
-      { icon: '🕶️', text: 'Interoperabilidad entre Meta Quest y Apple Vision Pro' },
+      {
+        icon: '🔃',
+        text: 'Iteración con recarga en caliente: sin compilar, sin APK, sin transferir',
+      },
+      { icon: '🕶️', text: 'El mismo enlace en Meta Quest y en Apple Vision Pro' },
       { icon: '🧩', text: 'IWSDK y frameworks ligeros sobre WebXR y Three.js' },
     ],
     visual: 'webxr-flow',
-    accent: { hex: ACCENT_CYAN, kicker: 'EL PRESENTE' },
+    accent: { hex: ACCENT_CYAN, kicker: 'LA WEB INMERSIVA' },
   },
+
   {
-    id: 'futuro',
+    id: 'agentes',
     kind: 'content',
-    title: 'El Futuro: Creación de Entornos Asistida por IA',
-    subtitle: 'El prompt sustituye al pipeline.',
+    title: 'Agentes de IA: el World Building deja de ser Artesanal',
+    subtitle: 'El prompt sustituye al pipeline manual, no al criterio.',
     bullets: [
-      { icon: '✨', text: 'Generación de escenas WebXR mediante prompts de texto' },
-      { icon: '☁️', text: 'Optimización automática de assets 3D en la nube' },
-      { icon: '💬', text: 'NPCs conversacionales en tiempo real dentro de la escena' },
+      { icon: '✨', text: 'Generación de escenas WebXR completas mediante prompts de texto' },
+      { icon: '☁️', text: 'Optimización automática de assets 3D en la nube: decimación, LODs y compresión' },
+      { icon: '💬', text: 'NPCs conversacionales en tiempo real dentro de la propia escena' },
+      { icon: '🤖', text: 'El agente escribe la escena, los componentes y los sistemas; tú diriges' },
     ],
     visual: 'ai-pillars',
-    accent: { hex: ACCENT_VIOLET, kicker: 'EL FUTURO' },
+    accent: { hex: ACCENT_VIOLET, kicker: 'LOS AGENTES' },
   },
+
   {
     id: 'revelacion',
     kind: 'reveal',
@@ -110,3 +246,8 @@ export const SLIDE_COUNT = SLIDES.length;
 
 /** Índice de la slide de revelación; el CTA inmersivo se resalta ahí. */
 export const REVEAL_INDEX = SLIDES.findIndex((s) => s.kind === 'reveal');
+
+/** Ruta pública de una imagen de slide, válida en dev y en subcarpetas. */
+export function mediaUrl(src: string): string {
+  return `${import.meta.env.BASE_URL}images/${src}`;
+}

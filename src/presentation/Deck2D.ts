@@ -20,7 +20,14 @@ import {
   slideIndex,
   xrSupported,
 } from './state.js';
-import { REVEAL_INDEX, SLIDES, SLIDE_COUNT, type Slide } from './slides.js';
+import {
+  mediaUrl,
+  PRESENTER,
+  REVEAL_INDEX,
+  SLIDES,
+  SLIDE_COUNT,
+  type Slide,
+} from './slides.js';
 
 /** Acciones que el deck delega en el sistema dueño del `World`. */
 export interface DeckActions {
@@ -34,81 +41,180 @@ function rgbChannels(hex: string): string {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
+/** Escapa texto de contenido antes de inyectarlo como HTML. */
+function esc(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /* -------------------------------------------------------------------------- */
 /* Mockups visuales                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** Slide 2 — ventana de Unity: Inspector saturado, errores y build en curso. */
-function unityConsoleMarkup(): string {
+/**
+ * Slide 2 — ventana del Editor de Unity.
+ *
+ * Reproduce el encuadre real que ve alguien montando un proyecto para Quest:
+ * Hierarchy con el rig, Inspector cargado de componentes, el navegador de
+ * Assets con prefabs y mallas `.obj`, y la consola compilando el APK.
+ */
+function unityEditorMarkup(): string {
+  const hierarchy = [
+    ['0', 'VRScene', 'scene'],
+    ['1', 'OVRCameraRig', 'prefab'],
+    ['2', 'TrackingSpace', ''],
+    ['3', 'CenterEyeAnchor', ''],
+    ['3', 'LeftHandAnchor', ''],
+    ['3', 'RightHandAnchor', ''],
+    ['1', 'OVRInteraction', 'prefab'],
+    ['1', 'PassthroughLayer', ''],
+    ['1', 'Environment', ''],
+    ['2', 'Table_LP', 'obj'],
+  ];
+
+  const assets = [
+    ['📁', 'Assets / Prefabs', ''],
+    ['🟦', 'HandGrabInteractable', '.prefab'],
+    ['🟦', 'BuildingBlock_Passthrough', '.prefab'],
+    ['📁', 'Assets / Models', ''],
+    ['🔺', 'Table_LP', '.obj'],
+    ['🔺', 'Shelf_LP', '.obj'],
+    ['📁', 'Assets / Materials', ''],
+    ['🎨', 'Wood_URP', '.mat'],
+  ];
+
+  const row = ([depth, name, tag]: string[]) => `
+    <div class="flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] hover:bg-white/[0.06]"
+         style="padding-left:${6 + Number(depth) * 11}px">
+      <span class="text-white/25">${Number(depth) > 0 ? '└' : '▾'}</span>
+      <span class="truncate text-white/75">${name}</span>
+      ${
+        tag === ''
+          ? ''
+          : `<span class="ml-auto shrink-0 rounded-sm px-1 text-[9px] ${
+              tag === 'prefab'
+                ? 'bg-[#6cc6ff]/20 text-[#6cc6ff]'
+                : tag === 'obj'
+                  ? 'bg-[#c9a2ff]/20 text-[#c9a2ff]'
+                  : 'bg-white/10 text-white/40'
+            }">${tag}</span>`
+      }
+    </div>`;
+
   return `
-    <div class="w-full overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] font-mono text-[11px] leading-relaxed shadow-2xl shadow-black/60 sm:text-xs">
-      <div class="flex items-center gap-2 border-b border-black/40 bg-[#3c3c3c] px-3 py-2">
+    <div class="w-full overflow-hidden rounded-xl border border-white/10 bg-[#383838] font-mono text-[10px] leading-relaxed shadow-2xl shadow-black/60 sm:text-[11px]">
+      <!-- Barra de título -->
+      <div class="flex items-center gap-2 border-b border-black/50 bg-[#4a4a4a] px-3 py-2">
         <span class="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
         <span class="h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
         <span class="h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
-        <span class="ml-2 truncate text-white/60">Unity 2019.4.31f1 — VRProject — Android</span>
+        <span class="ml-2 truncate text-white/65">Unity 6.3 LTS — VRProject</span>
+        <span class="ml-auto shrink-0 rounded bg-[#2c2c2c] px-2 py-0.5 text-[#6cc6ff]">Meta Quest</span>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-[1.05fr_1fr]">
-        <!-- Inspector abarrotado de scripts en C# -->
-        <div class="border-b border-black/40 p-3 md:border-b-0 md:border-r">
-          <div class="mb-2 text-[10px] uppercase tracking-widest text-white/40">Inspector</div>
-          <div class="space-y-1.5 text-white/75">
+      <div class="grid grid-cols-1 sm:grid-cols-[1.05fr_1fr]">
+        <!-- Hierarchy -->
+        <div class="border-b border-black/40 bg-[#2b2b2b] p-2 sm:border-b-0 sm:border-r">
+          <div class="mb-1.5 px-1 text-[9px] uppercase tracking-widest text-white/40">Hierarchy</div>
+          ${hierarchy.map(row).join('')}
+        </div>
+
+        <!-- Inspector -->
+        <div class="bg-[#2b2b2b] p-2">
+          <div class="mb-1.5 px-1 text-[9px] uppercase tracking-widest text-white/40">Inspector — OVRCameraRig</div>
+          <div class="space-y-1">
             ${[
-              'VRPlayerController.cs',
-              'OVRCameraRigManager.cs',
-              'TeleportLocomotionProvider.cs',
-              'HandPoseBakerEditor.cs',
-              'SceneStreamingBootstrap.cs',
-              'AudioOcclusionBaker.cs',
-              'AndroidManifestPatcher.cs',
+              'OVR Manager (Script)',
+              'OVR Camera Rig (Script)',
+              'Hand Grab Interactor',
+              'Locomotion Provider',
+              'Rigidbody · Box Collider',
             ]
               .map(
-                (script) => `
-              <div class="flex items-center gap-2 rounded-sm bg-white/[0.04] px-2 py-1">
+                (c) => `
+              <div class="flex items-center gap-2 rounded-sm bg-white/[0.05] px-2 py-1">
                 <span class="text-[#6cc6ff]">#</span>
-                <span class="truncate">${script}</span>
-                <span class="ml-auto shrink-0 text-white/25">Script</span>
+                <span class="truncate text-white/75">${c}</span>
               </div>`,
               )
               .join('')}
-            <div class="pt-1 text-white/30 caret">+ 23 componentes más</div>
+            <div class="px-2 pt-0.5 text-white/30 caret">+ 18 componentes más</div>
           </div>
         </div>
+      </div>
 
-        <!-- Consola con errores de compilación -->
-        <div class="p-3">
-          <div class="mb-2 text-[10px] uppercase tracking-widest text-white/40">Console</div>
-          <div class="space-y-1.5">
-            <div class="rounded-sm border-l-2 border-[#ff5f57] bg-[#ff5f57]/10 px-2 py-1 text-[#ffb3ae]">
-              CS0246: no se encontró el tipo <span class="text-white">OVRInput</span>
-            </div>
-            <div class="rounded-sm border-l-2 border-[#ff5f57] bg-[#ff5f57]/10 px-2 py-1 text-[#ffb3ae]">
-              CS1061: <span class="text-white">XRRig</span> no contiene <span class="text-white">TrackingOrigin</span>
-            </div>
-            <div class="rounded-sm border-l-2 border-[#febc2e] bg-[#febc2e]/10 px-2 py-1 text-[#ffe0a3]">
-              Shader variant stripping: 4.812 variantes
-            </div>
-            <div class="rounded-sm border-l-2 border-white/20 bg-white/[0.04] px-2 py-1 text-white/50">
-              Gradle: resolviendo dependencias (3/17)
-            </div>
-          </div>
+      <!-- Project / Assets -->
+      <div class="border-t border-black/40 bg-[#2b2b2b] p-2">
+        <div class="mb-1.5 px-1 text-[9px] uppercase tracking-widest text-white/40">Project</div>
+        <div class="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+          ${assets
+            .map(
+              ([icon, name, ext]) => `
+            <div class="flex items-center gap-1.5 truncate px-1 py-[2px]">
+              <span>${icon}</span>
+              <span class="truncate ${ext === '' ? 'text-white/45' : 'text-white/75'}">${name}</span>
+              <span class="shrink-0 text-white/25">${ext}</span>
+            </div>`,
+            )
+            .join('')}
+        </div>
+      </div>
 
-          <!-- Barra de progreso del build -->
-          <div class="mt-4">
-            <div class="mb-1.5 flex items-baseline justify-between text-[10px] text-white/50">
-              <span>Building APK…</span>
-              <span class="text-[#febc2e]">01:47:22 transcurrido</span>
-            </div>
-            <div class="build-bar h-2 w-full rounded-full bg-black/50"></div>
-            <div class="mt-1.5 text-[10px] text-white/30">Compiling assembly-csharp.dll — 1.3 GB de salida</div>
-          </div>
+      <!-- Console + build -->
+      <div class="border-t border-black/40 bg-[#232323] p-2.5">
+        <div class="mb-1.5 flex items-baseline justify-between">
+          <span class="text-[9px] uppercase tracking-widest text-white/40">Console</span>
+          <span class="text-[#febc2e]">Building APK…  01:47:22</span>
+        </div>
+        <div class="build-bar mb-1.5 h-1.5 w-full rounded-full bg-black/60"></div>
+        <div class="space-y-1">
+          <div class="truncate text-white/45">Compiling assembly-csharp.dll · baking lightmaps (3/7)</div>
+          <div class="truncate text-[#8ee6a0]">adb install -r VRProject.apk → Meta Quest 3</div>
         </div>
       </div>
     </div>`;
 }
 
-/** Slide 3 — diagrama de flujo: URL → Navegador → Experiencia inmersiva. */
+/** Slide 3 — Building Blocks: módulos que se arrastran, mundo que se monta a mano. */
+function buildingBlocksMarkup(): string {
+  const blocks = [
+    ['📷', 'Camera Rig'],
+    ['👁️', 'Passthrough'],
+    ['✋', 'Hand Tracking'],
+    ['🎮', 'Controllers'],
+    ['🤏', 'Grab Interaction'],
+    ['👉', 'Poke Interaction'],
+  ];
+
+  return `
+    <div class="w-full rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-5">
+      <div class="mb-3 text-[10px] uppercase tracking-widest text-amber-200/60">
+        Building Blocks · arrastrar y soltar
+      </div>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        ${blocks
+          .map(
+            ([icon, label]) => `
+          <div class="flex items-center gap-2 rounded-lg border border-amber-400/25 bg-[#1b1509]/70 px-3 py-2.5">
+            <span class="text-lg">${icon}</span>
+            <span class="truncate text-xs text-amber-100/80">${label}</span>
+          </div>`,
+          )
+          .join('')}
+      </div>
+      <div class="mt-4 flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
+        <span class="text-lg">🛠️</span>
+        <span class="text-xs leading-relaxed text-white/50">
+          …y a partir de aquí, <span class="text-white/80">todo a mano</span>: prefabs objeto por
+          objeto, colliders, iluminación y lightmaps horneados.
+        </span>
+      </div>
+    </div>`;
+}
+
+/** Slide 4 — diagrama de flujo: URL → Navegador → Experiencia inmersiva. */
 function webxrFlowMarkup(): string {
   const steps = [
     { icon: '🔗', label: 'URL / QR', note: 'un enlace' },
@@ -116,7 +222,7 @@ function webxrFlowMarkup(): string {
     { icon: '🕶️', label: 'Inmersión', note: 'en 1 segundo' },
   ];
   const arrow = `
-    <div class="flex items-center justify-center text-cyan-300/70 sm:rotate-0" aria-hidden="true">
+    <div class="flex items-center justify-center text-cyan-300/70" aria-hidden="true">
       <span class="hidden text-2xl sm:inline">→</span>
       <span class="text-2xl sm:hidden">↓</span>
     </div>`;
@@ -130,21 +236,21 @@ function webxrFlowMarkup(): string {
           ${i > 0 ? arrow : ''}
           <div class="rounded-lg border border-cyan-400/25 bg-[#071620]/80 px-4 py-4 text-center">
             <div class="text-2xl">${step.icon}</div>
-            <div class="font-display mt-2 text-sm text-cyan-200">${step.label}</div>
+            <div class="font-display mt-2 whitespace-nowrap text-sm text-cyan-200">${step.label}</div>
             <div class="mt-0.5 text-xs text-white/45">${step.note}</div>
           </div>`,
           )
           .join('')}
       </div>
       <div class="mt-4 text-center text-xs text-white/40">
-        Sin APK. Sin tienda. Sin revisión. El mismo enlace en
+        Sin APK. Sin ADB. Sin tienda. El mismo enlace en
         <span class="text-cyan-300">Quest 3</span> y en
         <span class="text-cyan-300">Vision Pro</span>.
       </div>
     </div>`;
 }
 
-/** Slide 4 — tres pilares de la creación asistida por IA. */
+/** Slide 5 — tres pilares de la creación asistida por agentes. */
 function aiPillarsMarkup(): string {
   const pillars = [
     { icon: '✨', title: 'Prompt → Escena', body: 'Geometría, materiales y layout generados desde texto.' },
@@ -168,8 +274,10 @@ function aiPillarsMarkup(): string {
 
 function visualMarkup(slide: Slide): string {
   switch (slide.visual) {
-    case 'unity-console':
-      return unityConsoleMarkup();
+    case 'unity-editor':
+      return unityEditorMarkup();
+    case 'building-blocks':
+      return buildingBlocksMarkup();
     case 'webxr-flow':
       return webxrFlowMarkup();
     case 'ai-pillars':
@@ -202,7 +310,7 @@ export class Deck2D {
     this.footer = document.getElementById('deck-footer') as HTMLElement;
   }
 
-  /** Conecta listeners y suscribe el render a las señales. Idempotente por uso. */
+  /** Conecta listeners y suscribe el render a las señales. */
   mount(): void {
     this.bindKeyboard();
     this.bindTouch();
@@ -216,6 +324,7 @@ export class Deck2D {
         // Leídas para que el efecto se re-ejecute cuando cambien.
         void xrSupported.value;
         void canGoNext.value;
+        void canGoPrev.value;
 
         this.root.hidden = immersive;
         if (!immersive) {
@@ -258,7 +367,7 @@ export class Deck2D {
       </div>`;
 
     this.stage.innerHTML = `
-      <article class="slide-enter w-full max-w-5xl" data-slide="${slide.id}">
+      <article class="slide-enter w-full max-w-6xl" data-slide="${slide.id}">
         ${slide.kind === 'content' ? this.contentMarkup(slide, rgb) : this.heroMarkup(slide, rgb)}
       </article>`;
 
@@ -268,7 +377,7 @@ export class Deck2D {
           <span aria-hidden="true">←</span><span class="hidden sm:inline">Anterior</span>
         </button>
         ${
-          index < SLIDE_COUNT - 1
+          canGoNext.value
             ? `<button class="btn" data-action="next" aria-label="Siguiente slide">
                  <span class="hidden sm:inline">Siguiente</span><span aria-hidden="true">→</span>
                </button>`
@@ -282,7 +391,7 @@ export class Deck2D {
           <button
             role="tab"
             aria-selected="${i === index}"
-            aria-label="Ir a ${s.title}"
+            aria-label="Ir a ${esc(s.title)}"
             data-action="goto"
             data-index="${i}"
             class="h-1.5 rounded-full transition-all ${
@@ -294,8 +403,10 @@ export class Deck2D {
       </div>
 
       <div class="flex items-center gap-2">
-        ${this.vrButtonMarkup(index, /* hero */ false)}
+        ${this.vrButtonMarkup(index, /* hero */ false, index !== REVEAL_INDEX)}
       </div>`;
+
+    this.bindMediaFallbacks();
   }
 
   /** Portada y revelación: tipografía grande y centrada. */
@@ -305,17 +416,17 @@ export class Deck2D {
       <div class="stagger flex flex-col items-center text-center">
         <div class="rounded-full border px-4 py-1.5 text-[11px] font-semibold tracking-[0.3em]"
              style="border-color:rgba(${rgb},0.4); color:${slide.accent.hex}; background:rgba(${rgb},0.08)">
-          ${isReveal ? 'PLOT TWIST' : 'PRESENTACIÓN INTERACTIVA'}
+          ${isReveal ? 'PLOT TWIST' : 'CONFERENCIA'}
         </div>
 
-        <h1 class="font-display mt-6 text-3xl leading-tight sm:text-5xl lg:text-6xl"
+        <h1 class="font-display mt-6 max-w-4xl text-2xl leading-tight sm:text-4xl lg:text-5xl"
             style="text-shadow:0 0 48px rgba(${rgb},0.45)">
-          ${slide.title}
+          ${esc(slide.title)}
         </h1>
 
         ${
           slide.subtitle
-            ? `<p class="mt-5 max-w-2xl text-base text-white/55 sm:text-xl">${slide.subtitle}</p>`
+            ? `<p class="mt-5 max-w-2xl text-sm text-white/55 sm:text-lg">${esc(slide.subtitle)}</p>`
             : ''
         }
 
@@ -328,9 +439,11 @@ export class Deck2D {
                    Ponte las gafas y se materializan a tu alrededor, en la misma slide en la que estás.
                  </p>
                </div>`
-            : `<div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+            : `${this.presenterMarkup(rgb)}
+               ${this.mediaMarkup(slide, /* compact */ true)}
+               <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
                  <button class="btn btn-vr" data-action="next">
-                   Siguiente <span aria-hidden="true">→</span>
+                   Comenzar <span aria-hidden="true">→</span>
                  </button>
                  ${this.vrButtonMarkup(0, /* hero */ false, /* showFallback */ false)}
                </div>`
@@ -338,30 +451,114 @@ export class Deck2D {
       </div>`;
   }
 
-  /** Slides de contenido: título + puntos clave a la izquierda, mockup a la derecha. */
+  /** Firma del ponente en la portada. */
+  private presenterMarkup(rgb: string): string {
+    return `
+      <div class="mt-9 flex flex-col items-center gap-1.5">
+        <div class="h-px w-16" style="background:linear-gradient(90deg,transparent,rgba(${rgb},0.7),transparent)"></div>
+        <p class="mt-2 text-xs uppercase tracking-[0.24em] text-white/35">Presentado por</p>
+        <p class="font-display text-lg text-white/90 sm:text-xl">${PRESENTER.name}</p>
+        <p class="text-xs tracking-[0.18em] text-white/45">
+          ${PRESENTER.role} <span class="mx-1.5 text-white/20">·</span> ${PRESENTER.year}
+        </p>
+      </div>`;
+  }
+
+  /** Slides de contenido: título + puntos a la izquierda, mockup a la derecha. */
   private contentMarkup(slide: Slide, rgb: string): string {
     const bullets = (slide.bullets ?? [])
       .map(
         (b) => `
         <li class="flex items-start gap-3">
-          <span class="mt-0.5 shrink-0 text-lg" aria-hidden="true">${b.icon}</span>
-          <span class="text-sm leading-relaxed text-white/70 sm:text-base">${b.text}</span>
+          <span class="mt-0.5 shrink-0 text-base" aria-hidden="true">${b.icon}</span>
+          <div class="min-w-0">
+            <p class="text-sm font-medium leading-snug text-white/85 sm:text-[15px]">${esc(b.text)}</p>
+            ${
+              b.detail == null
+                ? ''
+                : `<ul class="mt-1.5 space-y-1">
+                     ${b.detail
+                       .map(
+                         (d) => `
+                       <li class="flex gap-2 text-[12px] leading-relaxed text-white/50 sm:text-[13px]">
+                         <span class="shrink-0" style="color:rgba(${rgb},0.6)">—</span>
+                         <span>${esc(d)}</span>
+                       </li>`,
+                       )
+                       .join('')}
+                   </ul>`
+            }
+          </div>
         </li>`,
       )
       .join('');
 
     return `
-      <div class="grid grid-cols-1 items-center gap-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
+      <div class="grid grid-cols-1 items-center gap-8 lg:grid-cols-[1.05fr_1fr] lg:gap-10">
         <div class="stagger">
-          <h2 class="font-display text-2xl leading-snug sm:text-3xl lg:text-4xl"
+          <h2 class="font-display text-xl leading-snug sm:text-2xl lg:text-3xl"
               style="text-shadow:0 0 40px rgba(${rgb},0.35)">
-            ${slide.title}
+            ${esc(slide.title)}
           </h2>
-          ${slide.subtitle ? `<p class="mt-3 text-sm text-white/45 sm:text-base">${slide.subtitle}</p>` : ''}
-          <ul class="mt-6 space-y-3.5">${bullets}</ul>
+          ${slide.subtitle ? `<p class="mt-2.5 text-sm text-white/45">${esc(slide.subtitle)}</p>` : ''}
+          <ul class="mt-5 space-y-4">${bullets}</ul>
         </div>
-        <div class="stagger">${visualMarkup(slide)}</div>
+        <div class="stagger space-y-3">
+          ${visualMarkup(slide)}
+          ${this.mediaMarkup(slide, /* compact */ false)}
+        </div>
       </div>`;
+  }
+
+  /**
+   * Tira de imágenes.
+   *
+   * En 2D todas caen aquí, en fila, porque la pantalla es un rectángulo. En XR
+   * estas mismas imágenes se despegan y flotan alrededor del espectador — la
+   * diferencia entre ambas capas es justo el argumento de la charla.
+   */
+  private mediaMarkup(slide: Slide, compact: boolean): string {
+    const media = slide.media ?? [];
+    if (media.length === 0) {
+      return '';
+    }
+
+    const figures = media
+      .map(
+        (m) => `
+      <figure class="media-figure min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+        <img
+          src="${mediaUrl(m.src)}"
+          alt="${esc(m.caption)}"
+          loading="lazy"
+          class="block w-full object-cover ${compact ? 'max-h-44' : 'max-h-32'}"
+          style="aspect-ratio:${m.aspect ?? 1.6}"
+        />
+        <figcaption class="px-2.5 py-1.5 text-left text-[11px] leading-tight text-white/45">
+          ${esc(m.caption)}
+          ${m.source ? `<span class="block text-[10px] text-white/25">${esc(m.source)}</span>` : ''}
+        </figcaption>
+      </figure>`,
+      )
+      .join('');
+
+    return `<div class="${compact ? 'mt-8 w-full max-w-lg' : ''} flex gap-3">${figures}</div>`;
+  }
+
+  /**
+   * Las imágenes son opcionales: si un archivo no está en `public/images/`, la
+   * figura se retira en silencio en vez de dejar el icono de imagen rota.
+   */
+  private bindMediaFallbacks(): void {
+    for (const img of this.stage.querySelectorAll<HTMLImageElement>('.media-figure img')) {
+      img.addEventListener(
+        'error',
+        () => {
+          img.closest('figure')?.remove();
+        },
+        { once: true },
+      );
+    }
   }
 
   /**

@@ -45,7 +45,7 @@
         "asset": "legacy-monolith"
       },
       "transform": {
-        "position": [-2.35, 1.25, -2.1],
+        "position": [-3.6, 1.05, -1.0],
         "rotationDeg": [0, 24, 0]
       },
       "components": {
@@ -65,7 +65,7 @@
         "asset": "singularity"
       },
       "transform": {
-        "position": [2.35, 1.35, -2.1],
+        "position": [3.6, 1.15, -1.0],
         "rotationDeg": [0, -18, 0]
       },
       "components": {
@@ -81,7 +81,7 @@
       "id": "key-light-past",
       "name": "Luz del monolito",
       "transform": {
-        "position": [-2.1, 2.5, -1.2]
+        "position": [-3.0, 2.3, -0.8]
       },
       "components": {
         "com.iwsdk.components.PointLight": {

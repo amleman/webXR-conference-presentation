@@ -10,12 +10,16 @@ import {
   BufferAttribute,
   DoubleSide,
   FrontSide,
+  Group,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  TextureLoader,
+  Vector3,
   type BufferGeometry,
   type Texture,
 } from '@iwsdk/core';
+import type { MediaPlacement } from './slides.js';
 
 /** Tamaño del panel principal, en metros. Relación 16:10 como la textura. */
 export const PANEL_WIDTH = 2.6;
@@ -113,4 +117,117 @@ export function createButtonMesh(
   // Se dibuja después del panel para que el borde luminoso no lo recorte.
   mesh.renderOrder = 2;
   return mesh;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Paneles satélite de imagen                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Dónde se planta el espectador. Los satélites se orientan hacia aquí en vez de
+ * llevar rotaciones escritas a mano, que es lo que haría falta retocar cada vez
+ * que se mueve uno de ellos.
+ */
+const VIEWER = new Vector3(0, 1.6, 0);
+
+/**
+ * Posiciones de los satélites alrededor del espectador.
+ *
+ * Están por delante y a los lados del panel principal, envolviéndolo: es la
+ * diferencia visible entre esta capa y el deck 2D, donde las mismas imágenes
+ * sólo pueden apilarse dentro del rectángulo de la pantalla.
+ */
+export const MEDIA_SLOTS: Record<MediaPlacement, Vector3> = {
+  left: new Vector3(-2.2, 1.5, -1.1),
+  right: new Vector3(2.2, 1.5, -1.1),
+  overhead: new Vector3(0, 2.72, -2.05),
+};
+
+/** Ancho de un satélite, en metros. */
+export const MEDIA_PANEL_WIDTH = 1.2;
+
+/** Alto de la banda de pie de imagen, en metros. */
+const MEDIA_CAPTION_HEIGHT = 0.19;
+
+/** Aire entre la imagen y su pie, en metros. */
+const MEDIA_CAPTION_GAP = 0.02;
+
+export interface MediaPanel {
+  /** Raíz posicionada y orientada hacia el espectador. */
+  group: Group;
+  /** Material del plano de imagen; su `map` se rellena al cargar la textura. */
+  imageMaterial: MeshBasicMaterial;
+  /** Materiales que participan en el fundido de materialización. */
+  materials: MeshBasicMaterial[];
+}
+
+/**
+ * Crea un satélite: plano de imagen con su pie debajo, ya orientado hacia el
+ * espectador. Nace invisible; el sistema lo muestra cuando la textura carga y
+ * la slide es la activa.
+ */
+export function createMediaPanel(
+  captionTexture: Texture,
+  placement: MediaPlacement,
+  aspect: number,
+): MediaPanel {
+  const group = new Group();
+  group.name = `MediaPanel:${placement}`;
+  group.visible = false;
+
+  const imageHeight = MEDIA_PANEL_WIDTH / aspect;
+
+  const imageMaterial = new MeshBasicMaterial({
+    transparent: true,
+    side: FrontSide,
+    fog: false,
+    toneMapped: false,
+  });
+  const image = new Mesh(
+    new PlaneGeometry(MEDIA_PANEL_WIDTH, imageHeight),
+    imageMaterial,
+  );
+  image.position.y = (MEDIA_CAPTION_HEIGHT + MEDIA_CAPTION_GAP) / 2;
+  group.add(image);
+
+  const captionMaterial = new MeshBasicMaterial({
+    map: captionTexture,
+    transparent: true,
+    side: FrontSide,
+    depthWrite: false,
+    fog: false,
+    toneMapped: false,
+  });
+  const caption = new Mesh(
+    new PlaneGeometry(MEDIA_PANEL_WIDTH, MEDIA_CAPTION_HEIGHT),
+    captionMaterial,
+  );
+  caption.position.y = -(imageHeight + MEDIA_CAPTION_GAP) / 2;
+  caption.renderOrder = 2;
+  group.add(caption);
+
+  group.position.copy(MEDIA_SLOTS[placement]);
+  group.lookAt(VIEWER);
+
+  return { group, imageMaterial, materials: [imageMaterial, captionMaterial] };
+}
+
+/**
+ * Carga una imagen de slide.
+ *
+ * Las imágenes son opcionales: viven en `public/images/` y puede que el archivo
+ * todavía no esté ahí. Por eso se resuelve a `null` en vez de propagar el error,
+ * y el satélite simplemente no aparece. Se usa `TextureLoader` directamente —y
+ * no el manifiesto— precisamente porque estas cargas deben poder fallar sin
+ * tumbar el arranque del mundo.
+ */
+export function loadOptionalTexture(url: string): Promise<Texture | null> {
+  return new Promise((resolve) => {
+    new TextureLoader().load(
+      url,
+      (texture) => resolve(texture),
+      undefined,
+      () => resolve(null),
+    );
+  });
 }

@@ -2,17 +2,17 @@
  * SlideTexture — dibuja una slide sobre un `<canvas>` y la envuelve en una
  * `CanvasTexture` lista para un panel 3D.
  *
- * Las cinco texturas se pintan una sola vez al arrancar y después sólo se
- * intercambia `material.map`. Nada se repinta por frame: cambiar de slide en VR
- * cuesta una asignación de puntero, no un redibujado.
+ * Las texturas se pintan una sola vez al arrancar y después sólo se intercambia
+ * `material.map`. Nada se repinta por frame: cambiar de slide en VR cuesta una
+ * asignación de puntero, no un redibujado.
  *
- * El diseño reproduce la jerarquía del deck 2D (cápsula, título, subtítulo,
- * puntos, mockup, puntos de progreso) para que el espectador reconozca la misma
- * diapositiva al ponerse las gafas.
+ * Las slides de contenido se componen a dos columnas — texto a la izquierda,
+ * mockup a la derecha — igual que el deck 2D, para que el espectador reconozca
+ * la misma diapositiva al ponerse las gafas.
  */
 
 import { CanvasTexture, LinearFilter, SRGBColorSpace } from '@iwsdk/core';
-import type { Slide } from './slides.js';
+import { PRESENTER, type Slide } from './slides.js';
 
 /** Resolución de la textura. 16:10, suficiente para leer a 2 m sin aliasing. */
 export const PANEL_TEXTURE_WIDTH = 1536;
@@ -25,6 +25,12 @@ const FAINT = 'rgba(230, 246, 255, 0.3)';
 const DISPLAY_FONT = 'Orbitron, system-ui, sans-serif';
 const BODY_FONT = 'Inter, system-ui, sans-serif';
 const MONO_FONT = '"JetBrains Mono", ui-monospace, monospace';
+
+/** Márgenes y rejilla de dos columnas de las slides de contenido. */
+const PAD_X = 64;
+const TEXT_COL_WIDTH = 762;
+const VISUAL_COL_X = 868;
+const VISUAL_COL_WIDTH = PANEL_TEXTURE_WIDTH - PAD_X - VISUAL_COL_X;
 
 /* -------------------------------------------------------------------------- */
 /* Utilidades de dibujo                                                        */
@@ -102,107 +108,263 @@ function drawWrapped(
   return cursorY;
 }
 
+/** Etiqueta de sección en mayúsculas, usada dentro de los mockups. */
+function drawSectionLabel(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+): void {
+  ctx.textAlign = 'left';
+  ctx.font = `11px ${MONO_FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText(label.toUpperCase(), x, y);
+}
+
 /* -------------------------------------------------------------------------- */
-/* Mockups simplificados                                                       */
+/* Mockups                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Ventana de Unity: inspector saturado, errores y barra de build. */
-function drawUnityConsole(
+/**
+ * Ventana del Editor de Unity, apilada en vertical para la columna derecha:
+ * Hierarchy con el rig, navegador de Assets con prefabs y `.obj`, y la consola
+ * compilando y desplegando el APK por ADB.
+ */
+function drawUnityEditor(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
   h: number,
 ): void {
-  ctx.fillStyle = '#2b2b2b';
+  ctx.fillStyle = '#383838';
   roundRect(ctx, x, y, w, h, 14);
   ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
-  // Barra de título
-  ctx.fillStyle = '#3c3c3c';
+  // --- Barra de título -----------------------------------------------------
+  ctx.fillStyle = '#4a4a4a';
   roundRect(ctx, x, y, w, 40, 14);
   ctx.fill();
   ctx.fillRect(x, y + 26, w, 14);
 
-  const dots = ['#ff5f57', '#febc2e', '#28c840'];
-  dots.forEach((color, i) => {
+  ['#ff5f57', '#febc2e', '#28c840'].forEach((color, i) => {
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x + 24 + i * 22, y + 20, 6, 0, Math.PI * 2);
+    ctx.arc(x + 22 + i * 20, y + 20, 5.5, 0, Math.PI * 2);
     ctx.fill();
   });
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = `18px ${MONO_FONT}`;
+
   ctx.textAlign = 'left';
-  ctx.fillText('Unity 2019.4 — VRProject — Android', x + 100, y + 26);
+  ctx.font = `15px ${MONO_FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText('Unity 6.3 LTS — VRProject', x + 90, y + 26);
 
-  // Columna izquierda: scripts en C#
-  const padX = x + 22;
-  let rowY = y + 62;
-  ctx.font = `17px ${MONO_FONT}`;
-  const scripts = [
-    'VRPlayerController.cs',
-    'OVRCameraRigManager.cs',
-    'TeleportLocomotion.cs',
-    'HandPoseBakerEditor.cs',
-    'AndroidManifestPatcher.cs',
+  // Plataforma de destino: Meta Quest, no un "Android" genérico.
+  ctx.font = `13px ${MONO_FONT}`;
+  const badge = 'Meta Quest';
+  const badgeW = ctx.measureText(badge).width + 20;
+  ctx.fillStyle = '#2c2c2c';
+  roundRect(ctx, x + w - badgeW - 14, y + 10, badgeW, 21, 5);
+  ctx.fill();
+  ctx.fillStyle = '#6cc6ff';
+  ctx.fillText(badge, x + w - badgeW - 4, y + 25);
+
+  const padX = x + 16;
+  const innerW = w - 32;
+  let cursor = y + 62;
+
+  // --- Hierarchy -----------------------------------------------------------
+  ctx.fillStyle = '#2b2b2b';
+  roundRect(ctx, padX, cursor - 16, innerW, 208, 7);
+  ctx.fill();
+  drawSectionLabel(ctx, 'Hierarchy', padX + 10, cursor);
+  cursor += 16;
+
+  const hierarchy: Array<[number, string, string]> = [
+    [0, 'VRScene', ''],
+    [1, 'OVRCameraRig', 'prefab'],
+    [2, 'TrackingSpace', ''],
+    [2, 'LeftHandAnchor', ''],
+    [1, 'OVRInteraction', 'prefab'],
+    [1, 'PassthroughLayer', ''],
+    [1, 'Table_LP', 'obj'],
   ];
-  for (const script of scripts) {
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    roundRect(ctx, padX, rowY, w * 0.44, 30, 5);
-    ctx.fill();
-    ctx.fillStyle = '#6cc6ff';
-    ctx.fillText('#', padX + 12, rowY + 21);
+  ctx.font = `14px ${MONO_FONT}`;
+  for (const [depth, name, tag] of hierarchy) {
+    const rowX = padX + 12 + depth * 15;
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillText(depth > 0 ? '└' : '▾', rowX, cursor + 12);
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText(script, padX + 32, rowY + 21);
-    rowY += 36;
-  }
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.fillText('+ 23 componentes más', padX + 12, rowY + 20);
+    ctx.fillText(name, rowX + 18, cursor + 12);
 
-  // Columna derecha: consola de errores
-  const colX = x + w * 0.5;
-  const colW = w * 0.5 - 24;
-  let errY = y + 62;
-  const logs: Array<[string, string, string]> = [
-    ['#ff5f57', 'rgba(255,95,87,0.12)', 'CS0246: no se encontró OVRInput'],
-    ['#ff5f57', 'rgba(255,95,87,0.12)', 'CS1061: XRRig sin TrackingOrigin'],
-    ['#febc2e', 'rgba(254,188,46,0.12)', 'Shader stripping: 4.812 variantes'],
+    if (tag !== '') {
+      const tagColor = tag === 'prefab' ? '#6cc6ff' : '#c9a2ff';
+      ctx.font = `11px ${MONO_FONT}`;
+      const tagW = ctx.measureText(tag).width + 14;
+      ctx.fillStyle = `${tagColor}33`;
+      roundRect(ctx, padX + innerW - tagW - 12, cursor + 1, tagW, 16, 4);
+      ctx.fill();
+      ctx.fillStyle = tagColor;
+      ctx.fillText(tag, padX + innerW - tagW - 5, cursor + 13);
+      ctx.font = `14px ${MONO_FONT}`;
+    }
+    cursor += 25;
+  }
+
+  // --- Project / Assets ----------------------------------------------------
+  cursor += 26;
+  ctx.fillStyle = '#2b2b2b';
+  roundRect(ctx, padX, cursor - 16, innerW, 140, 7);
+  ctx.fill();
+  drawSectionLabel(ctx, 'Project — Assets', padX + 10, cursor);
+  cursor += 18;
+
+  const assets: Array<[string, string, string]> = [
+    ['📁', 'Assets / Prefabs', ''],
+    ['🟦', 'HandGrabInteractable', '.prefab'],
+    ['📁', 'Assets / Models', ''],
+    ['🔺', 'Table_LP', '.obj'],
   ];
-  for (const [accent, bg, label] of logs) {
-    ctx.fillStyle = bg;
-    roundRect(ctx, colX, errY, colW, 34, 5);
-    ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.fillRect(colX, errY, 3, 34);
-    ctx.fillStyle = 'rgba(255,220,215,0.9)';
-    ctx.font = `16px ${MONO_FONT}`;
-    ctx.fillText(label, colX + 14, errY + 23);
-    errY += 42;
+  for (const [icon, name, ext] of assets) {
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.fillStyle = INK;
+    ctx.fillText(icon, padX + 12, cursor + 12);
+    ctx.font = `14px ${MONO_FONT}`;
+    ctx.fillStyle = ext === '' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.78)';
+    ctx.fillText(name, padX + 36, cursor + 12);
+    if (ext !== '') {
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.textAlign = 'right';
+      ctx.fillText(ext, padX + innerW - 12, cursor + 12);
+      ctx.textAlign = 'left';
+    }
+    cursor += 27;
   }
 
-  // Barra de progreso "Building APK…"
-  const barY = errY + 26;
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = `16px ${MONO_FONT}`;
-  ctx.fillText('Building APK…', colX, barY);
+  // --- Consola + build -----------------------------------------------------
+  cursor += 26;
+  const consoleH = y + h - cursor - 2;
+  ctx.fillStyle = '#232323';
+  roundRect(ctx, padX, cursor - 16, innerW, Math.max(consoleH, 60), 7);
+  ctx.fill();
+  drawSectionLabel(ctx, 'Console', padX + 10, cursor);
+
+  ctx.font = `13px ${MONO_FONT}`;
   ctx.fillStyle = '#febc2e';
   ctx.textAlign = 'right';
-  ctx.fillText('01:47:22', colX + colW, barY);
+  ctx.fillText('Building APK…  01:47:22', padX + innerW - 12, cursor);
   ctx.textAlign = 'left';
+  cursor += 16;
 
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  roundRect(ctx, colX, barY + 12, colW, 10, 5);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  roundRect(ctx, padX + 12, cursor, innerW - 24, 8, 4);
   ctx.fill();
   ctx.fillStyle = '#febc2e';
-  roundRect(ctx, colX, barY + 12, colW * 0.42, 10, 5);
+  roundRect(ctx, padX + 12, cursor, (innerW - 24) * 0.42, 8, 4);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = `14px ${MONO_FONT}`;
-  ctx.fillText('1.3 GB de salida', colX, barY + 44);
+  cursor += 28;
+
+  ctx.font = `13px ${MONO_FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('baking lightmaps (3/7)', padX + 12, cursor);
+  cursor += 22;
+  ctx.fillStyle = '#8ee6a0';
+  ctx.fillText('adb install -r VRProject.apk', padX + 12, cursor);
 }
 
-/** Diagrama URL → Navegador → Inmersión. */
+/** Building Blocks: módulos que se arrastran, y el recordatorio de lo manual. */
+function drawBuildingBlocks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  accent: string,
+): void {
+  const channels = rgb(accent);
+
+  const blocks: Array<[string, string]> = [
+    ['📷', 'Camera Rig'],
+    ['👁️', 'Passthrough'],
+    ['✋', 'Hand Tracking'],
+    ['🎮', 'Controllers'],
+    ['🤏', 'Grab Interaction'],
+    ['👉', 'Poke Interaction'],
+  ];
+
+  const gap = 12;
+  const cols = 2;
+  const rows = Math.ceil(blocks.length / cols);
+  const cellW = (w - 40 - gap) / cols;
+  const cellH = 58;
+  const noteH = 86;
+
+  // La caja se dimensiona por su contenido y se centra en la banda disponible:
+  // estirarla hasta el borde inferior dejaba un vacío bajo el texto.
+  const boxH = 50 + rows * cellH + (rows - 1) * gap + 22 + noteH + 20;
+  const boxY = y + Math.max((h - boxH) / 2, 0);
+
+  ctx.fillStyle = `rgba(${channels}, 0.05)`;
+  roundRect(ctx, x, boxY, w, boxH, 14);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${channels}, 0.25)`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.font = `12px ${MONO_FONT}`;
+  ctx.fillStyle = `rgba(${channels}, 0.7)`;
+  ctx.fillText('BUILDING BLOCKS · ARRASTRAR Y SOLTAR', x + 20, boxY + 32);
+
+  const gridTop = boxY + 50;
+
+  blocks.forEach(([icon, label], i) => {
+    const cx = x + 20 + (i % cols) * (cellW + gap);
+    const cy = gridTop + Math.floor(i / cols) * (cellH + gap);
+
+    ctx.fillStyle = 'rgba(27, 21, 9, 0.75)';
+    roundRect(ctx, cx, cy, cellW, cellH, 10);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${channels}, 0.3)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = '26px system-ui, sans-serif';
+    ctx.fillStyle = INK;
+    ctx.fillText(icon, cx + 16, cy + 38);
+    ctx.font = `16px ${BODY_FONT}`;
+    ctx.fillStyle = 'rgba(255, 240, 210, 0.85)';
+    ctx.fillText(label, cx + 54, cy + 36);
+  });
+
+  // El remate: lo que el SDK no automatiza.
+  const noteTop = gridTop + rows * cellH + (rows - 1) * gap + 22;
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  roundRect(ctx, x + 20, noteTop, w - 40, noteH, 10);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.font = '24px system-ui, sans-serif';
+  ctx.fillStyle = INK;
+  ctx.fillText('🛠️', x + 36, noteTop + 36);
+  ctx.font = `16px ${BODY_FONT}`;
+  ctx.fillStyle = MUTED;
+  drawWrapped(
+    ctx,
+    '…y a partir de aquí, todo a mano: prefabs objeto por objeto, colliders, luces y lightmaps horneados.',
+    x + 72,
+    noteTop + 30,
+    w - 96,
+    23,
+  );
+}
+
+/** Flujo URL → Navegador → Inmersión, apilado para la columna derecha. */
 function drawWebxrFlow(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -211,53 +373,63 @@ function drawWebxrFlow(
   h: number,
   accent: string,
 ): void {
-  const steps: Array<[string, string]> = [
-    ['🔗', 'URL / QR'],
-    ['🌐', 'Navegador'],
-    ['🕶️', 'Inmersión'],
+  const channels = rgb(accent);
+  const steps: Array<[string, string, string]> = [
+    ['🔗', 'URL / QR', 'un enlace'],
+    ['🌐', 'Navegador', 'sin instalar'],
+    ['🕶️', 'Inmersión', 'en 1 segundo'],
   ];
-  const gap = 44;
-  const boxW = (w - gap * 2) / 3;
-  const boxH = Math.min(h - 60, 190);
-  const boxY = y + (h - boxH) / 2 - 16;
 
-  steps.forEach(([icon, label], i) => {
-    const boxX = x + i * (boxW + gap);
+  const arrowH = 34;
+  const boxH = Math.min((h - 60 - arrowH * 2) / 3, 108);
+  let cursor = y + 10;
 
-    ctx.fillStyle = `rgba(${rgb(accent)}, 0.07)`;
-    roundRect(ctx, boxX, boxY, boxW, boxH, 14);
+  steps.forEach(([icon, label, note], i) => {
+    if (i > 0) {
+      ctx.textAlign = 'center';
+      ctx.font = '28px system-ui, sans-serif';
+      ctx.fillStyle = `rgba(${channels}, 0.65)`;
+      ctx.fillText('↓', x + w / 2, cursor + 24);
+      cursor += arrowH;
+    }
+
+    ctx.fillStyle = `rgba(${channels}, 0.07)`;
+    roundRect(ctx, x, cursor, w, boxH, 12);
     ctx.fill();
-    ctx.strokeStyle = `rgba(${rgb(accent)}, 0.35)`;
+    ctx.strokeStyle = `rgba(${channels}, 0.35)`;
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.textAlign = 'center';
-    ctx.font = '54px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.font = '38px system-ui, sans-serif';
     ctx.fillStyle = INK;
-    ctx.fillText(icon, boxX + boxW / 2, boxY + 82);
-    ctx.font = `600 24px ${DISPLAY_FONT}`;
-    ctx.fillStyle = accent;
-    ctx.fillText(label, boxX + boxW / 2, boxY + 136);
+    ctx.fillText(icon, x + 26, cursor + boxH / 2 + 13);
 
-    // Flecha hacia el siguiente paso
-    if (i < steps.length - 1) {
-      ctx.fillStyle = `rgba(${rgb(accent)}, 0.7)`;
-      ctx.font = '38px system-ui, sans-serif';
-      ctx.fillText('→', boxX + boxW + gap / 2, boxY + boxH / 2 + 14);
-    }
+    ctx.font = `600 22px ${DISPLAY_FONT}`;
+    ctx.fillStyle = accent;
+    ctx.fillText(label, x + 88, cursor + boxH / 2 - 4);
+    ctx.font = `16px ${BODY_FONT}`;
+    ctx.fillStyle = FAINT;
+    ctx.fillText(note, x + 88, cursor + boxH / 2 + 22);
+
+    cursor += boxH;
   });
 
   ctx.textAlign = 'center';
-  ctx.font = `18px ${BODY_FONT}`;
+  ctx.font = `15px ${BODY_FONT}`;
   ctx.fillStyle = FAINT;
-  ctx.fillText(
-    'Sin APK. Sin tienda. El mismo enlace en Quest 3 y en Vision Pro.',
+  drawWrapped(
+    ctx,
+    'Sin APK. Sin ADB. Sin tienda.',
     x + w / 2,
-    boxY + boxH + 44,
+    cursor + 32,
+    w,
+    21,
+    'center',
   );
 }
 
-/** Tres tarjetas con los pilares de la creación asistida por IA. */
+/** Tres pilares de la creación asistida por agentes, apilados. */
 function drawAiPillars(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -266,46 +438,73 @@ function drawAiPillars(
   h: number,
   accent: string,
 ): void {
+  const channels = rgb(accent);
   const cards: Array<[string, string, string]> = [
     ['✨', 'Prompt → Escena', 'Geometría y layout desde texto'],
     ['☁️', 'Assets en la nube', 'LODs y compresión automáticos'],
     ['💬', 'NPCs vivos', 'Diálogo en tiempo real'],
   ];
-  const gap = 26;
-  const cardW = (w - gap * 2) / 3;
-  const cardH = Math.min(h - 40, 220);
-  const cardY = y + (h - cardH) / 2;
 
-  cards.forEach(([icon, title, body], i) => {
-    const cardX = x + i * (cardW + gap);
+  const gap = 16;
+  const cardH = Math.min((h - gap * 2) / 3, 128);
+  let cursor = y + (h - (cardH * 3 + gap * 2)) / 2;
 
-    ctx.fillStyle = `rgba(${rgb(accent)}, 0.08)`;
-    roundRect(ctx, cardX, cardY, cardW, cardH, 16);
+  for (const [icon, title, body] of cards) {
+    ctx.fillStyle = `rgba(${channels}, 0.08)`;
+    roundRect(ctx, x, cursor, w, cardH, 14);
     ctx.fill();
-    ctx.strokeStyle = `rgba(${rgb(accent)}, 0.3)`;
+    ctx.strokeStyle = `rgba(${channels}, 0.3)`;
     ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.textAlign = 'left';
-    ctx.font = '44px system-ui, sans-serif';
+    ctx.font = '34px system-ui, sans-serif';
     ctx.fillStyle = INK;
-    ctx.fillText(icon, cardX + 24, cardY + 68);
+    ctx.fillText(icon, x + 24, cursor + cardH / 2 + 12);
 
-    ctx.font = `600 23px ${DISPLAY_FONT}`;
+    ctx.font = `600 21px ${DISPLAY_FONT}`;
     ctx.fillStyle = accent;
-    ctx.fillText(title, cardX + 24, cardY + 116);
-
-    ctx.font = `18px ${BODY_FONT}`;
+    ctx.fillText(title, x + 78, cursor + cardH / 2 - 6);
+    ctx.font = `16px ${BODY_FONT}`;
     ctx.fillStyle = MUTED;
-    drawWrapped(ctx, body, cardX + 24, cardY + 152, cardW - 48, 26);
-  });
+    ctx.fillText(body, x + 78, cursor + cardH / 2 + 22);
+
+    cursor += cardH + gap;
+  }
+}
+
+function drawVisual(
+  ctx: CanvasRenderingContext2D,
+  slide: Slide,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  switch (slide.visual) {
+    case 'unity-editor':
+      drawUnityEditor(ctx, x, y, w, h);
+      break;
+    case 'building-blocks':
+      drawBuildingBlocks(ctx, x, y, w, h, slide.accent.hex);
+      break;
+    case 'webxr-flow':
+      drawWebxrFlow(ctx, x, y, w, h, slide.accent.hex);
+      break;
+    case 'ai-pillars':
+      drawAiPillars(ctx, x, y, w, h, slide.accent.hex);
+      break;
+    default:
+      break;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pintado de la slide completa                                                */
+/* Chrome común del panel                                                      */
 /* -------------------------------------------------------------------------- */
 
-function paintSlide(
+/** Fondo, borde luminoso, cápsula del kicker y contador. */
+function drawPanelChrome(
   ctx: CanvasRenderingContext2D,
   slide: Slide,
   index: number,
@@ -319,7 +518,6 @@ function paintSlide(
   ctx.clearRect(0, 0, W, H);
   ctx.textBaseline = 'alphabetic';
 
-  // Fondo: cristal oscuro con una veladura del color de acento arriba.
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, 'rgba(8, 16, 30, 0.97)');
   bg.addColorStop(1, 'rgba(3, 6, 14, 0.97)');
@@ -333,74 +531,94 @@ function paintSlide(
   ctx.fillStyle = wash;
   ctx.fill();
 
-  // Borde luminoso
   ctx.strokeStyle = `rgba(${channels}, 0.55)`;
   ctx.lineWidth = 4;
   roundRect(ctx, 2, 2, W - 4, H - 4, 34);
   ctx.stroke();
 
-  const padX = 72;
-  const contentW = W - padX * 2;
-
-  // Cápsula superior con el kicker
-  ctx.font = `700 20px ${DISPLAY_FONT}`;
+  // Cápsula con el kicker
+  ctx.font = `700 19px ${DISPLAY_FONT}`;
   const kicker = slide.accent.kicker;
-  const kickerW = ctx.measureText(kicker).width + 48;
+  const kickerW = ctx.measureText(kicker).width + 44;
   ctx.fillStyle = `rgba(${channels}, 0.14)`;
-  roundRect(ctx, padX, 56, kickerW, 44, 22);
+  roundRect(ctx, PAD_X, 52, kickerW, 42, 21);
   ctx.fill();
   ctx.strokeStyle = `rgba(${channels}, 0.45)`;
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = accent;
   ctx.textAlign = 'left';
-  ctx.fillText(kicker, padX + 24, 85);
+  ctx.fillText(kicker, PAD_X + 22, 79);
 
-  // Contador de slide, alineado a la derecha
-  ctx.font = `18px ${MONO_FONT}`;
+  // Contador
+  ctx.font = `17px ${MONO_FONT}`;
   ctx.fillStyle = FAINT;
   ctx.textAlign = 'right';
   ctx.fillText(
     `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`,
-    W - padX,
-    85,
+    W - PAD_X,
+    79,
   );
 
-  const centered = slide.kind !== 'content';
-  const titleX = centered ? W / 2 : padX;
-  const titleAlign: CanvasTextAlign = centered ? 'center' : 'left';
-
-  const titleFont = `800 ${centered ? 66 : 52}px ${DISPLAY_FONT}`;
-  const subtitleFont = `${centered ? 32 : 26}px ${BODY_FONT}`;
-  const titleLineHeight = centered ? 82 : 68;
-  const subtitleLineHeight = centered ? 46 : 38;
-  const titleMaxWidth = centered ? contentW - 120 : contentW;
-  const subtitleMaxWidth = centered ? contentW - 240 : contentW;
-
-  // Las slides sin puntos ni mockup (portada y revelación) son puro texto: se
-  // mide el bloque entero antes de pintarlo para centrarlo de verdad en el
-  // panel, en lugar de anclarlo a una Y fija y dejar un hueco debajo.
-  let cursorY: number;
-  if (centered) {
-    ctx.font = titleFont;
-    const titleLines = wrapText(ctx, slide.title, titleMaxWidth).length;
-    ctx.font = subtitleFont;
-    const subtitleLines =
-      slide.subtitle == null
-        ? 0
-        : wrapText(ctx, slide.subtitle, subtitleMaxWidth).length;
-
-    const blockHeight =
-      titleLines * titleLineHeight +
-      (subtitleLines > 0 ? 30 + subtitleLines * subtitleLineHeight : 0);
-    // Centro óptico ligeramente alto: debajo viven los puntos de progreso y,
-    // en la revelación, la llamada a la acción.
-    cursorY = (H * 0.92 - blockHeight) / 2 + titleLineHeight * 0.78;
-  } else {
-    cursorY = 190;
+  // Puntos de progreso, horneados para no gastar geometría extra.
+  const dotY = H - 46;
+  const dotGap = 28;
+  const startX = W / 2 - ((total - 1) * dotGap) / 2;
+  for (let i = 0; i < total; i += 1) {
+    ctx.beginPath();
+    if (i === index) {
+      roundRect(ctx, startX + i * dotGap - 12, dotY - 6, 30, 11, 5.5);
+      ctx.fillStyle = accent;
+    } else {
+      ctx.arc(startX + i * dotGap, dotY, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(230, 246, 255, 0.22)';
+    }
+    ctx.fill();
   }
+}
 
-  // Título
+/* -------------------------------------------------------------------------- */
+/* Composición de la slide                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** Portada y revelación: bloque de texto medido y centrado en el panel. */
+function paintHeroSlide(
+  ctx: CanvasRenderingContext2D,
+  slide: Slide,
+  index: number,
+  total: number,
+): void {
+  const W = PANEL_TEXTURE_WIDTH;
+  const H = PANEL_TEXTURE_HEIGHT;
+  const accent = slide.accent.hex;
+  const channels = rgb(accent);
+
+  drawPanelChrome(ctx, slide, index, total);
+
+  const isCover = slide.kind === 'cover';
+  const titleFont = `800 ${isCover ? 50 : 62}px ${DISPLAY_FONT}`;
+  const titleLineHeight = isCover ? 64 : 78;
+  const titleMaxWidth = W - PAD_X * 2 - 120;
+  const subtitleFont = `${isCover ? 25 : 30}px ${BODY_FONT}`;
+  const subtitleLineHeight = isCover ? 38 : 44;
+  const subtitleMaxWidth = W - PAD_X * 2 - 300;
+
+  // Se mide el bloque completo antes de pintar, para centrarlo de verdad en
+  // lugar de anclarlo a una Y fija y dejar un hueco debajo.
+  ctx.font = titleFont;
+  const titleLines = wrapText(ctx, slide.title, titleMaxWidth).length;
+  ctx.font = subtitleFont;
+  const subtitleLines =
+    slide.subtitle == null ? 0 : wrapText(ctx, slide.subtitle, subtitleMaxWidth).length;
+
+  const presenterHeight = isCover ? 132 : 0;
+  const blockHeight =
+    titleLines * titleLineHeight +
+    (subtitleLines > 0 ? 28 + subtitleLines * subtitleLineHeight : 0) +
+    presenterHeight;
+
+  let cursorY = (H * 0.9 - blockHeight) / 2 + titleLineHeight * 0.78;
+
   ctx.shadowColor = `rgba(${channels}, 0.55)`;
   ctx.shadowBlur = 34;
   ctx.fillStyle = INK;
@@ -408,96 +626,152 @@ function paintSlide(
   cursorY = drawWrapped(
     ctx,
     slide.title,
-    titleX,
+    W / 2,
     cursorY,
     titleMaxWidth,
     titleLineHeight,
-    titleAlign,
+    'center',
   );
   ctx.shadowBlur = 0;
 
-  // Subtítulo
   if (slide.subtitle != null) {
     ctx.font = subtitleFont;
     ctx.fillStyle = MUTED;
     cursorY = drawWrapped(
       ctx,
       slide.subtitle,
-      titleX,
-      cursorY + (centered ? 30 : 18),
+      W / 2,
+      cursorY + 28,
       subtitleMaxWidth,
       subtitleLineHeight,
-      titleAlign,
+      'center',
     );
   }
 
-  // Puntos clave
-  if (slide.bullets != null && slide.bullets.length > 0) {
-    cursorY += 34;
-    for (const bullet of slide.bullets) {
-      ctx.textAlign = 'left';
-      ctx.font = '30px system-ui, sans-serif';
-      ctx.fillStyle = INK;
-      ctx.fillText(bullet.icon, padX, cursorY);
+  if (isCover) {
+    // Firma del ponente, separada por un filete degradado.
+    const ruleY = cursorY + 26;
+    const rule = ctx.createLinearGradient(W / 2 - 90, 0, W / 2 + 90, 0);
+    rule.addColorStop(0, 'rgba(0,0,0,0)');
+    rule.addColorStop(0.5, `rgba(${channels}, 0.75)`);
+    rule.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rule;
+    ctx.fillRect(W / 2 - 90, ruleY, 180, 2);
 
-      ctx.font = `26px ${BODY_FONT}`;
-      ctx.fillStyle = 'rgba(230, 246, 255, 0.78)';
-      cursorY = drawWrapped(ctx, bullet.text, padX + 52, cursorY, contentW - 52, 36);
-      cursorY += 18;
-    }
+    ctx.textAlign = 'center';
+    ctx.font = `14px ${BODY_FONT}`;
+    ctx.fillStyle = FAINT;
+    ctx.fillText('P R E S E N T A D O   P O R', W / 2, ruleY + 34);
+
+    ctx.font = `700 34px ${DISPLAY_FONT}`;
+    ctx.fillStyle = INK;
+    ctx.fillText(PRESENTER.name, W / 2, ruleY + 78);
+
+    ctx.font = `18px ${BODY_FONT}`;
+    ctx.fillStyle = MUTED;
+    ctx.fillText(`${PRESENTER.role}  ·  ${PRESENTER.year}`, W / 2, ruleY + 110);
   }
 
-  // Mockup visual, ocupando la banda inferior libre
-  const visualTop = Math.max(cursorY + 16, H - 330);
-  const visualH = H - visualTop - 108;
-  if (visualH > 120) {
-    switch (slide.visual) {
-      case 'unity-console':
-        drawUnityConsole(ctx, padX, visualTop, contentW, visualH);
-        break;
-      case 'webxr-flow':
-        drawWebxrFlow(ctx, padX, visualTop, contentW, visualH, accent);
-        break;
-      case 'ai-pillars':
-        drawAiPillars(ctx, padX, visualTop, contentW, visualH, accent);
-        break;
-      default:
-        break;
-    }
-  }
-
-  // Llamada a la acción de la slide de revelación
   if (slide.kind === 'reveal') {
     ctx.textAlign = 'center';
-    ctx.font = `20px ${BODY_FONT}`;
+    ctx.font = `19px ${BODY_FONT}`;
     ctx.fillStyle = MUTED;
     drawWrapped(
       ctx,
       'Estás dentro. Estos paneles son geometría, no diapositivas.',
       W / 2,
-      H - 190,
-      contentW - 200,
-      32,
+      H - 140,
+      W - PAD_X * 2 - 200,
+      30,
       'center',
     );
   }
+}
 
-  // Puntos de progreso: el mismo indicador que el deck 2D, pero horneado
-  // en la textura para no gastar geometría extra.
-  const dotY = H - 54;
-  const dotGap = 30;
-  const startX = W / 2 - ((total - 1) * dotGap) / 2;
-  for (let i = 0; i < total; i += 1) {
-    const active = i === index;
-    ctx.beginPath();
-    if (active) {
-      roundRect(ctx, startX + i * dotGap - 13, dotY - 6, 32, 12, 6);
-      ctx.fillStyle = accent;
-    } else {
-      ctx.arc(startX + i * dotGap, dotY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(230, 246, 255, 0.22)';
+/** Slides de contenido: texto a la izquierda, mockup a la derecha. */
+function paintContentSlide(
+  ctx: CanvasRenderingContext2D,
+  slide: Slide,
+  index: number,
+  total: number,
+): void {
+  const accent = slide.accent.hex;
+  const channels = rgb(accent);
+
+  drawPanelChrome(ctx, slide, index, total);
+
+  // --- Columna de texto ----------------------------------------------------
+  let cursorY = 168;
+
+  ctx.shadowColor = `rgba(${channels}, 0.5)`;
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = INK;
+  ctx.font = `800 38px ${DISPLAY_FONT}`;
+  cursorY = drawWrapped(ctx, slide.title, PAD_X, cursorY, TEXT_COL_WIDTH, 50);
+  ctx.shadowBlur = 0;
+
+  if (slide.subtitle != null) {
+    ctx.font = `21px ${BODY_FONT}`;
+    ctx.fillStyle = MUTED;
+    cursorY = drawWrapped(ctx, slide.subtitle, PAD_X, cursorY + 16, TEXT_COL_WIDTH, 29);
+  }
+
+  cursorY += 34;
+  for (const bullet of slide.bullets ?? []) {
+    ctx.textAlign = 'left';
+    ctx.font = '24px system-ui, sans-serif';
+    ctx.fillStyle = INK;
+    ctx.fillText(bullet.icon, PAD_X, cursorY);
+
+    ctx.font = `600 23px ${BODY_FONT}`;
+    ctx.fillStyle = 'rgba(230, 246, 255, 0.88)';
+    cursorY = drawWrapped(
+      ctx,
+      bullet.text,
+      PAD_X + 42,
+      cursorY,
+      TEXT_COL_WIDTH - 42,
+      31,
+    );
+
+    // Desarrollo del punto, con guion del color de acento.
+    if (bullet.detail != null) {
+      cursorY += 6;
+      for (const line of bullet.detail) {
+        ctx.font = `18px ${BODY_FONT}`;
+        ctx.fillStyle = `rgba(${channels}, 0.65)`;
+        ctx.fillText('—', PAD_X + 46, cursorY + 12);
+        ctx.fillStyle = 'rgba(230, 246, 255, 0.52)';
+        cursorY = drawWrapped(
+          ctx,
+          line,
+          PAD_X + 72,
+          cursorY + 12,
+          TEXT_COL_WIDTH - 72,
+          25,
+        );
+        cursorY += 4;
+      }
     }
-    ctx.fill();
+    cursorY += 20;
+  }
+
+  // --- Columna del mockup --------------------------------------------------
+  const visualTop = 160;
+  const visualHeight = PANEL_TEXTURE_HEIGHT - visualTop - 96;
+  drawVisual(ctx, slide, VISUAL_COL_X, visualTop, VISUAL_COL_WIDTH, visualHeight);
+}
+
+function paintSlide(
+  ctx: CanvasRenderingContext2D,
+  slide: Slide,
+  index: number,
+  total: number,
+): void {
+  if (slide.kind === 'content') {
+    paintContentSlide(ctx, slide, index, total);
+  } else {
+    paintHeroSlide(ctx, slide, index, total);
   }
 }
 
@@ -583,6 +857,58 @@ export function createButtonTexture(
   ctx.shadowColor = `rgba(${channels}, 0.8)`;
   ctx.shadowBlur = 18;
   ctx.fillText(label, width / 2, height / 2 + 2);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.minFilter = LinearFilter;
+  texture.magFilter = LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
+}
+
+/**
+ * Marco de una imagen satélite: borde luminoso y pie con el texto.
+ *
+ * La imagen en sí es una textura aparte sobre otro plano; esto es sólo el
+ * cristal que la sostiene, para que flote con el mismo lenguaje visual que los
+ * paneles de slide.
+ */
+export function createMediaFrameTexture(
+  caption: string,
+  source: string | undefined,
+  accent: string,
+  width = 768,
+  height = 128,
+): CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx == null) {
+    throw new Error('No se pudo obtener un contexto 2D para el pie de imagen');
+  }
+
+  const channels = rgb(accent);
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = 'rgba(6, 12, 22, 0.88)';
+  roundRect(ctx, 0, 0, width, height, 16);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${channels}, 0.45)`;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `600 34px ${BODY_FONT}`;
+  ctx.fillStyle = INK;
+  ctx.fillText(caption, 28, source == null ? height / 2 + 12 : 54);
+
+  if (source != null) {
+    ctx.font = `24px ${MONO_FONT}`;
+    ctx.fillStyle = FAINT;
+    ctx.fillText(source, 28, 92);
+  }
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;

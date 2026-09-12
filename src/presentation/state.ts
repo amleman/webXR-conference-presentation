@@ -25,7 +25,10 @@ export const xrSupported = signal(false);
 /** Dirección del último cambio: `1` hacia delante, `-1` hacia atrás. */
 export const lastDirection = signal<1 | -1>(1);
 
-export const canGoPrev = computed(() => slideIndex.peek() > 0);
+// Ambas leen `.value`, no `.peek()`: un `computed` que espía la señal en vez de
+// leerla no registra la dependencia, se evalúa una sola vez y se queda cacheado
+// para siempre — que es exactamente cómo el botón "Anterior" nació deshabilitado.
+export const canGoPrev = computed(() => slideIndex.value > 0);
 export const canGoNext = computed(() => slideIndex.value < SLIDE_COUNT - 1);
 
 /** Salta a una slide concreta. Índices fuera de rango se ignoran en silencio. */

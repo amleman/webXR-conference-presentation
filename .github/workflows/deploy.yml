@@ -49,7 +49,12 @@ jobs:
       - name: Desactivar Jekyll
         run: touch dist/.nojekyll
 
+      # `enablement: true` intenta conmutar el repositorio a "Pages vía GitHub
+      # Actions" por API. Si el repo sigue en "Deploy from a branch", este paso
+      # es el que falla y hay que cambiar la opción a mano en Settings -> Pages.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -17,6 +17,7 @@ import {
   MeshBasicMaterial,
   Pressed,
   RayInteractable,
+  SRGBColorSpace,
   VisibilityState,
   type Entity,
   type Mesh,
@@ -29,11 +30,15 @@ import {
 } from '../presentation/ecs-components.js';
 import {
   createButtonMesh,
+  createMediaPanel,
   createPanelMesh,
+  loadOptionalTexture,
+  type MediaPanel,
 } from '../presentation/PanelBuilder.js';
-import { SLIDES, SLIDE_COUNT } from '../presentation/slides.js';
+import { mediaUrl, SLIDES, SLIDE_COUNT } from '../presentation/slides.js';
 import {
   createButtonTexture,
+  createMediaFrameTexture,
   createSlideTexture,
   type SlideTextureHandle,
 } from '../presentation/SlideTexture.js';
@@ -82,6 +87,13 @@ export class PresentationSystem extends createSystem({
   private slideTextures: SlideTextureHandle[] = [];
   /** Materiales cuya opacidad participa en la animación de materialización. */
   private fadeMaterials: MeshBasicMaterial[] = [];
+  /** Satélites de imagen, con la slide a la que pertenecen. */
+  private mediaPanels: Array<{
+    slide: number;
+    panel: MediaPanel;
+    /** `false` mientras la imagen no haya cargado, o si el archivo no existe. */
+    ready: boolean;
+  }> = [];
   /** Progreso 0→1 de la aparición de los paneles al entrar en XR. */
   private reveal = 0;
 
@@ -130,6 +142,8 @@ export class PresentationSystem extends createSystem({
       this.createNavButton(spec, rigEntity);
     }
 
+    this.buildMediaPanels();
+
     this.cleanupFuncs.push(() => {
       rigEntity.dispose();
       for (const handle of this.slideTextures) {
@@ -161,6 +175,62 @@ export class PresentationSystem extends createSystem({
     this.cleanupFuncs.push(() => texture.dispose());
   }
 
+  /**
+   * Satélites de imagen: las figuras que en el deck 2D tienen que apilarse
+   * dentro del rectángulo de la pantalla aquí se despegan y flotan alrededor del
+   * espectador. Es el argumento de la charla hecho geometría.
+   *
+   * Se construyen todos por adelantado y se ocultan; mostrar una slide es
+   * conmutar `visible`, no crear objetos.
+   */
+  private buildMediaPanels(): void {
+    SLIDES.forEach((slide, index) => {
+      for (const media of slide.media ?? []) {
+        const captionTexture = createMediaFrameTexture(
+          media.caption,
+          media.source,
+          slide.accent.hex,
+        );
+        const panel = createMediaPanel(
+          captionTexture,
+          media.placement,
+          media.aspect ?? 1.6,
+        );
+        this.rig.add(panel.group);
+        this.fadeMaterials.push(...panel.materials);
+
+        const record = { slide: index, panel, ready: false };
+        this.mediaPanels.push(record);
+
+        void loadOptionalTexture(mediaUrl(media.src)).then((texture) => {
+          // `null` significa que el archivo no está en `public/images/`. El
+          // satélite se queda oculto y nadie ve una textura rota.
+          if (texture == null) {
+            return;
+          }
+          texture.colorSpace = SRGBColorSpace;
+          panel.imageMaterial.map = texture;
+          panel.imageMaterial.needsUpdate = true;
+          record.ready = true;
+          this.syncMediaVisibility();
+        });
+
+        this.cleanupFuncs.push(() => {
+          captionTexture.dispose();
+          panel.imageMaterial.map?.dispose();
+        });
+      }
+    });
+  }
+
+  /** Deja visibles sólo los satélites cargados de la slide activa. */
+  private syncMediaVisibility(): void {
+    const active = slideIndex.peek();
+    for (const record of this.mediaPanels) {
+      record.panel.group.visible = record.ready && record.slide === active;
+    }
+  }
+
   private mountDeck(): void {
     this.deck = new Deck2D({
       // `launchXR` exige un gesto del usuario: el clic del botón lo es.
@@ -189,6 +259,7 @@ export class PresentationSystem extends createSystem({
         }
         this.panelMaterial.map = handle.texture;
         this.panelMaterial.needsUpdate = true;
+        this.syncMediaVisibility();
       }),
     );
   }
