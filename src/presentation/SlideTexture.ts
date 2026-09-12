@@ -364,6 +364,102 @@ function drawBuildingBlocks(
   );
 }
 
+/**
+ * Terminal de desarrollo con IWSDK.
+ *
+ * Contrapunto deliberado del Editor de Unity de la slide 2: allí la consola
+ * marca "Building APK… 01:47:22"; aquí marca "ready in 412 ms" y
+ * "hmr update — 18 ms".
+ */
+function drawDevTerminal(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  accent: string,
+): void {
+  const channels = rgb(accent);
+  const boxH = Math.min(h, 430);
+  const boxY = y + Math.max((h - boxH) / 2, 0);
+
+  ctx.fillStyle = '#0b1016';
+  roundRect(ctx, x, boxY, w, boxH, 14);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${channels}, 0.3)`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // --- Barra de título -----------------------------------------------------
+  ctx.fillStyle = '#141b23';
+  roundRect(ctx, x, boxY, w, 40, 14);
+  ctx.fill();
+  ctx.fillRect(x, boxY + 26, w, 14);
+
+  ['#ff5f57', '#febc2e', '#28c840'].forEach((color, i) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x + 22 + i * 20, boxY + 20, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.textAlign = 'left';
+  ctx.font = `15px ${MONO_FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText('zsh — presentacion-coecys', x + 90, boxY + 26);
+
+  ctx.font = `13px ${MONO_FONT}`;
+  const badgeW = ctx.measureText('HMR').width + 20;
+  ctx.fillStyle = `rgba(${channels}, 0.18)`;
+  roundRect(ctx, x + w - badgeW - 14, boxY + 10, badgeW, 21, 5);
+  ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.fillText('HMR', x + w - badgeW - 4, boxY + 25);
+
+  // --- Cuerpo --------------------------------------------------------------
+  // Cada línea es una lista de tramos [texto, color]; se pintan seguidos para
+  // conservar el coloreado de una terminal real sin medir a mano cada columna.
+  const dim = 'rgba(255,255,255,0.42)';
+  const faint = 'rgba(255,255,255,0.25)';
+  const bright = 'rgba(255,255,255,0.9)';
+  const cyan = '#67e8f9';
+  const violet = '#c4b5fd';
+
+  const lines: Array<Array<[string, string]> | null> = [
+    [['➜ ', accent], ['~/proyectos ', faint], ['npm create iwsdk@latest mi-experiencia', bright]],
+    [['✔ ', accent], ['Plantilla creada · cero dependencias nativas', dim]],
+    [['➜ ', accent], ['~/proyectos ', faint], ['npm run dev', bright]],
+    null,
+    [['VITE v7.1.4', violet], ['  ready in 412 ms', accent]],
+    [['➜ Local:   ', faint], ['https://localhost:8081/', cyan]],
+    [['➜ Network: ', faint], ['https://192.168.1.42:8081/', cyan]],
+    [['           abre este enlace en el Quest ↑', faint]],
+    null,
+    [['[vite] ', accent], ['hmr update ', bright], ['/src/scene.ts  ', dim], ['18 ms', accent]],
+    [['[vite] ', accent], ['hmr update ', bright], ['/src/systems/panel.ts  ', dim], ['11 ms', accent]],
+    [['sin APK · sin ADB · sin reinstalar', faint]],
+  ];
+
+  ctx.font = `15px ${MONO_FONT}`;
+  let cursor = boxY + 72;
+  for (const line of lines) {
+    if (line == null) {
+      // Separador: un filete tenue en lugar de una línea en blanco.
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(x + 18, cursor - 6, w - 36, 1);
+      cursor += 18;
+      continue;
+    }
+    let penX = x + 18;
+    for (const [text, color] of line) {
+      ctx.fillStyle = color;
+      ctx.fillText(text, penX, cursor);
+      penX += ctx.measureText(text).width;
+    }
+    cursor += 27;
+  }
+}
+
 /** Flujo URL → Navegador → Inmersión, apilado para la columna derecha. */
 function drawWebxrFlow(
   ctx: CanvasRenderingContext2D,
@@ -493,6 +589,9 @@ function drawVisual(
       break;
     case 'ai-pillars':
       drawAiPillars(ctx, x, y, w, h, slide.accent.hex);
+      break;
+    case 'dev-terminal':
+      drawDevTerminal(ctx, x, y, w, h, slide.accent.hex);
       break;
     default:
       break;
@@ -744,7 +843,7 @@ function paintContentSlide(
         ctx.fillStyle = 'rgba(230, 246, 255, 0.52)';
         cursorY = drawWrapped(
           ctx,
-          line,
+          line.replace(/`/g, ''),
           PAD_X + 72,
           cursorY + 12,
           TEXT_COL_WIDTH - 72,

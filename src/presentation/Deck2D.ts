@@ -49,6 +49,19 @@ function esc(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
+/**
+ * Escapa y además convierte `así` en `<code>`, como en Markdown.
+ *
+ * Se aplica sólo donde el contenido puede citar comandos; el resto del texto
+ * pasa por `esc` a secas.
+ */
+function escCode(text: string): string {
+  return esc(text).replace(
+    /`([^`]+)`/g,
+    '<code class="rounded bg-white/10 px-1 py-px text-[0.92em] text-white/85">$1</code>',
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Mockups visuales                                                            */
 /* -------------------------------------------------------------------------- */
@@ -214,6 +227,50 @@ function buildingBlocksMarkup(): string {
     </div>`;
 }
 
+/**
+ * Slide 6 — terminal de desarrollo con IWSDK.
+ *
+ * Es el contrapunto deliberado del Editor de Unity de la slide 2: allí la
+ * consola dice "Building APK… 01:47:22"; aquí dice "ready in 412 ms" y
+ * "hmr update — 18 ms". El argumento entero de la charla cabe en esa comparación.
+ */
+function devTerminalMarkup(): string {
+  const line = (content: string) =>
+    `<div class="whitespace-pre truncate">${content}</div>`;
+  const prompt = (cmd: string) =>
+    line(
+      `<span class="text-emerald-400">➜</span> <span class="text-white/35">~/proyectos</span> <span class="text-white/90">${cmd}</span>`,
+    );
+
+  return `
+    <div class="w-full overflow-hidden rounded-xl border border-emerald-400/20 bg-[#0b1016] font-mono text-[10px] leading-relaxed shadow-2xl shadow-black/60 sm:text-[11px]">
+      <div class="flex items-center gap-2 border-b border-white/10 bg-[#141b23] px-3 py-2">
+        <span class="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-[#febc2e]"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
+        <span class="ml-2 truncate text-white/55">zsh — presentacion-coecys</span>
+        <span class="ml-auto shrink-0 rounded bg-emerald-400/15 px-2 py-0.5 text-emerald-300">HMR</span>
+      </div>
+
+      <div class="space-y-1 p-3">
+        ${prompt('npm create iwsdk@latest mi-experiencia')}
+        ${line('<span class="text-emerald-400">✔</span> <span class="text-white/45">Plantilla creada · cero dependencias nativas</span>')}
+        ${prompt('npm run dev')}
+        ${line('<span class="text-white/45">&nbsp;</span>')}
+        ${line('<span class="text-violet-300">VITE v7.1.4</span>  <span class="text-emerald-400">ready in 412 ms</span>')}
+        ${line('<span class="text-white/35">➜ Local:  </span> <span class="text-cyan-300">https://localhost:8081/</span>')}
+        ${line('<span class="text-white/35">➜ Network:</span> <span class="text-cyan-300">https://192.168.1.42:8081/</span>')}
+        ${line('<span class="text-white/25">          abre este enlace en el Quest ↑</span>')}
+
+        <div class="!my-2 h-px bg-white/10"></div>
+
+        ${line('<span class="text-emerald-400">[vite]</span> <span class="text-white/70">hmr update</span> <span class="text-white/45">/src/scene.ts</span>  <span class="text-emerald-400">18 ms</span>')}
+        ${line('<span class="text-emerald-400">[vite]</span> <span class="text-white/70">hmr update</span> <span class="text-white/45">/src/systems/panel.ts</span>  <span class="text-emerald-400">11 ms</span>')}
+        ${line('<span class="text-white/30 caret">sin APK · sin ADB · sin reinstalar </span>')}
+      </div>
+    </div>`;
+}
+
 /** Slide 4 — diagrama de flujo: URL → Navegador → Experiencia inmersiva. */
 function webxrFlowMarkup(): string {
   const steps = [
@@ -282,6 +339,8 @@ function visualMarkup(slide: Slide): string {
       return webxrFlowMarkup();
     case 'ai-pillars':
       return aiPillarsMarkup();
+    case 'dev-terminal':
+      return devTerminalMarkup();
     default:
       return '';
   }
@@ -367,7 +426,7 @@ export class Deck2D {
       </div>`;
 
     this.stage.innerHTML = `
-      <article class="slide-enter w-full max-w-6xl" data-slide="${slide.id}">
+      <article class="slide-enter my-auto w-full max-w-6xl py-2" data-slide="${slide.id}">
         ${slide.kind === 'content' ? this.contentMarkup(slide, rgb) : this.heroMarkup(slide, rgb)}
       </article>`;
 
@@ -482,7 +541,7 @@ export class Deck2D {
                          (d) => `
                        <li class="flex gap-2 text-[12px] leading-relaxed text-white/50 sm:text-[13px]">
                          <span class="shrink-0" style="color:rgba(${rgb},0.6)">—</span>
-                         <span>${esc(d)}</span>
+                         <span>${escCode(d)}</span>
                        </li>`,
                        )
                        .join('')}
@@ -501,7 +560,7 @@ export class Deck2D {
             ${esc(slide.title)}
           </h2>
           ${slide.subtitle ? `<p class="mt-2.5 text-sm text-white/45">${esc(slide.subtitle)}</p>` : ''}
-          <ul class="mt-5 space-y-4">${bullets}</ul>
+          <ul class="mt-5 space-y-3.5">${bullets}</ul>
         </div>
         <div class="stagger space-y-3">
           ${visualMarkup(slide)}

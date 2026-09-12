@@ -13,7 +13,8 @@ export type SlideVisual =
   | 'unity-editor'
   | 'building-blocks'
   | 'webxr-flow'
-  | 'ai-pillars';
+  | 'ai-pillars'
+  | 'dev-terminal';
 
 /**
  * Dónde vive una imagen cuando la presentación está en XR.
@@ -71,6 +72,7 @@ export const ACCENT_CYAN = '#22d3ee';
 export const ACCENT_AMBER = '#fbbf24';
 export const ACCENT_MAGENTA = '#e879f9';
 export const ACCENT_VIOLET = '#a78bfa';
+export const ACCENT_EMERALD = '#34d399';
 
 /** Quién presenta. Aparece en la portada, en las dos capas. */
 export const PRESENTER = {
@@ -90,7 +92,7 @@ export const SLIDES: readonly Slide[] = [
     accent: { hex: ACCENT_CYAN, kicker: 'PORTADA' },
     media: [
       {
-        src: 'quest-3s.jpg',
+        src: 'meta-quest-3s.webp',
         caption: 'Meta Quest 3S',
         aspect: 1.5,
         placement: 'right',
@@ -132,17 +134,17 @@ export const SLIDES: readonly Slide[] = [
     accent: { hex: ACCENT_AMBER, kicker: 'EL WALKTHROUGH' },
     media: [
       {
-        src: 'meta-unity-sdk.jpg',
-        caption: 'Meta XR SDK para Unity',
-        source: 'developers.meta.com/horizon',
-        aspect: 1.6,
+        src: 'meta-xr-all-in-one-sdk.jpg',
+        caption: 'Meta XR All-in-One SDK',
+        source: 'assetstore.unity.com',
+        aspect: 1.5,
         placement: 'left',
       },
       {
-        src: 'meta-unity-partnership.jpg',
+        src: 'Unity-Meta-parntership.webp',
         caption: 'Meta y Unity, alianza multianual',
         source: 'uploadvr.com',
-        aspect: 1.6,
+        aspect: 1.903,
         placement: 'right',
       },
     ],
@@ -182,18 +184,25 @@ export const SLIDES: readonly Slide[] = [
     accent: { hex: ACCENT_AMBER, kicker: 'EL SDK MODERNO' },
     media: [
       {
-        src: 'building-blocks.jpg',
+        src: 'buildingblocks.png',
         caption: 'Building Blocks del Meta XR SDK',
         source: 'medium.com/antaeus-ar',
-        aspect: 1.6,
+        aspect: 1.855,
         placement: 'left',
       },
       {
-        src: 'interaction-sdk.jpg',
+        src: 'meta-xr-interaction-sdk.jpg',
         caption: 'Meta XR Interaction SDK Essentials',
         source: 'assetstore.unity.com',
-        aspect: 1.6,
+        aspect: 1.5,
         placement: 'right',
+      },
+      {
+        src: 'meta-xr-core-sdk.jpg',
+        caption: 'Meta XR Core SDK',
+        source: 'assetstore.unity.com',
+        aspect: 1.5,
+        placement: 'overhead',
       },
     ],
   },
@@ -230,6 +239,49 @@ export const SLIDES: readonly Slide[] = [
     ],
     visual: 'ai-pillars',
     accent: { hex: ACCENT_VIOLET, kicker: 'LOS AGENTES' },
+  },
+
+  {
+    id: 'iwsdk',
+    kind: 'content',
+    title: 'Configuración y Desarrollo con IWSDK',
+    subtitle: 'Del motor pesado al stack web estándar.',
+    bullets: [
+      {
+        icon: '⌨️',
+        text: 'Inicialización ligera desde la terminal',
+        detail: [
+          'Node.js y paquetes npm: `npm create iwsdk` sobre Vite',
+          'Integra el ecosistema de la web: Three.js y la WebXR API',
+        ],
+      },
+      {
+        icon: '⚡',
+        text: 'Cero tiempo de compilación (HMR)',
+        detail: [
+          'Servidor local con `npm run dev` y Hot Module Replacement',
+          'Cambias una línea en VS Code y se refleja en milisegundos en el visor, sin compilar APKs',
+        ],
+      },
+      {
+        icon: '🔍',
+        text: 'Depuración e inspección directa',
+        detail: [
+          'Chrome DevTools para depurar la escena e inspeccionar elementos',
+          'Emulación de controladores en el navegador de la PC, antes de ponértelas',
+        ],
+      },
+      {
+        icon: '🧭',
+        text: 'Abstracción espacial nativa',
+        detail: [
+          'Capas de interfaz espacial, gestión de manos y rayos de selección',
+          'Rendimiento optimizado para navegadores como Meta Quest Browser',
+        ],
+      },
+    ],
+    visual: 'dev-terminal',
+    accent: { hex: ACCENT_EMERALD, kicker: 'EL STACK WEB' },
   },
 
   {

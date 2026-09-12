@@ -32,7 +32,8 @@ o volver de VR a 2D deja siempre al espectador en el mismo punto.
 | 3   | Meta XR SDK, Fortalezas de Unity y Construcción de Mundos     | Building Blocks, Interaction SDK, la artesanía que queda |
 | 4   | WebXR: Inmersión Instantánea, Sin Instalación                 | La URL como experiencia; se acaba el APK y el ADB        |
 | 5   | Agentes de IA: el World Building deja de ser Artesanal        | Prompt → escena, assets en la nube, NPCs vivos           |
-| 6   | Plot twist                                                   | La revelación y el salto a inmersivo                     |
+| 6   | Configuración y Desarrollo con IWSDK                          | `npm create iwsdk`, HMR, DevTools, abstracción espacial  |
+| 7   | Plot twist                                                   | La revelación y el salto a inmersivo                     |
 
 Todo el texto vive en [`src/presentation/slides.ts`](src/presentation/slides.ts).
 Es la fuente de verdad única: editar una slide ahí la cambia en las dos capas.
@@ -44,8 +45,8 @@ Las imágenes son **opcionales** y viven en
 slide y de dónde sacarlo. Si un archivo no está, la figura desaparece sola en 2D
 y el panel no aparece en XR — nunca se ve una imagen rota.
 
-En XR estas imágenes **se despegan del panel** y flotan a los lados del
-espectador. Es el argumento de la charla hecho geometría: en 2D sólo pueden
+En XR estas imágenes **se despegan del panel** y flotan a los lados y por encima
+del espectador (`left`, `right`, `overhead`). Es el argumento de la charla hecho geometría: en 2D sólo pueden
 apilarse dentro del rectángulo de la pantalla; en inmersivo, los límites de una
 presentación dejan de ser un cuadro 16:9.
 
